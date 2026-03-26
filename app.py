@@ -197,9 +197,11 @@ if load_video or st.session_state["video"] is not None:
                 video_info.total_frames,
             ) 
             
-            if FIXED_COURT_KEYPOINTS_LOAD_PATH is not None:
+            if FIXED_COURT_KEYPOINTS_LOAD_PATH is not None and os.path.exists(FIXED_COURT_KEYPOINTS_LOAD_PATH):
                 with open(FIXED_COURT_KEYPOINTS_LOAD_PATH, "r") as f:
                     SELECTED_KEYPOINTS = json.load(f)
+            else:
+                FIXED_COURT_KEYPOINTS_LOAD_PATH = None
 
             st.session_state["fixed_keypoints_detection"] = Keypoints(
                 [
