@@ -22,7 +22,7 @@ def test_estimate_velocity_classes_exist():
 
 
 def test_analytics_import():
-    from analytics import DataAnalytics  # noqa: F401
+    from analytics.data_analytics import DataAnalytics  # noqa: F401
 
 
 def test_utils_import():
