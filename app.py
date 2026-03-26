@@ -181,157 +181,167 @@ if load_video or st.session_state["video"] is not None:
 
         st.session_state["df"] = None
 
-        with st.spinner("Downloading video..."):
-            tmp_input_path = tempfile.mktemp(suffix=".mp4")
-
-            gdrive_match = re.search(r"/file/d/([a-zA-Z0-9_-]+)", video_url)
-            if gdrive_match or "drive.google.com" in video_url:
-                import gdown
-                file_id = gdrive_match.group(1) if gdrive_match else video_url
-                gdown.download(id=file_id, output=tmp_input_path, quiet=False)
-            else:
-                response = requests.get(video_url, stream=True, timeout=300)
-                response.raise_for_status()
-                with open(tmp_input_path, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", tmp_input_path, "-vcodec", "libx264", "tmp.mp4"],
-            check=True,
+        _url_cache = "./cache/current_video_url.txt"
+        _skip_download = (
+            os.path.exists("tmp.mp4")
+            and os.path.getsize("tmp.mp4") > 0
+            and os.path.exists(_url_cache)
+            and open(_url_cache).read().strip() == video_url.strip()
         )
-        os.unlink(tmp_input_path)
+
+        if _skip_download:
+            st.info("Video already downloaded — resuming from cache.")
+        else:
+            with st.spinner("Downloading video..."):
+                tmp_input_path = tempfile.mktemp(suffix=".mp4")
+
+                gdrive_match = re.search(r"/file/d/([a-zA-Z0-9_-]+)", video_url)
+                if gdrive_match or "drive.google.com" in video_url:
+                    import gdown
+                    file_id = gdrive_match.group(1) if gdrive_match else video_url
+                    gdown.download(id=file_id, output=tmp_input_path, quiet=False)
+                else:
+                    response = requests.get(video_url, stream=True, timeout=300)
+                    response.raise_for_status()
+                    with open(tmp_input_path, "wb") as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", tmp_input_path, "-vcodec", "libx264", "tmp.mp4"],
+                check=True,
+            )
+            os.unlink(tmp_input_path)
+            with open(_url_cache, "w") as _f:
+                _f.write(video_url.strip())
 
     if st.session_state["df"] is None:
 
-        st.subheader("Analysis Progress")
-        progress_bar = st.progress(0.0)
-        status_text = st.empty()
+        with st.status("Analysing video...", expanded=True) as _status:
 
-        def progress_callback(step_name, current, total):
-            pct = current / total if total else 1.0
-            progress_bar.progress(pct)
-            label = step_name.replace("_", " ").title()
-            status_text.text(f"Step {current + 1}/{total}: {label}...")
+            def progress_callback(step_name, current, total):
+                if step_name == "done":
+                    return
+                label = step_name.replace("_", " ").title()
+                _status.write(f"▶ {label}  (step {current + 1} / {total})")
 
-        video_info = sv.VideoInfo.from_video_path(video_path="tmp.mp4")
-        fps, w, h, total_frames = (
-            video_info.fps,
-            video_info.width,
-            video_info.height,
-            video_info.total_frames,
-        )
-
-        if FIXED_COURT_KEYPOINTS_LOAD_PATH is not None and os.path.exists(FIXED_COURT_KEYPOINTS_LOAD_PATH):
-            with open(FIXED_COURT_KEYPOINTS_LOAD_PATH, "r") as f:
-                SELECTED_KEYPOINTS = json.load(f)
-            fixed_keypoints = Keypoints(
-                [
-                    Keypoint(
-                        id=i,
-                        xy=tuple(float(x) for x in v)
-                    )
-                    for i, v in enumerate(SELECTED_KEYPOINTS)
-                ]
+            _status.write("Setting up trackers...")
+            video_info = sv.VideoInfo.from_video_path(video_path="tmp.mp4")
+            fps, w, h, total_frames = (
+                video_info.fps,
+                video_info.width,
+                video_info.height,
+                video_info.total_frames,
             )
-            keypoints_array = np.array(SELECTED_KEYPOINTS)
-            polygon_zone = sv.PolygonZone(
-                np.concatenate(
-                    (
-                        np.expand_dims(keypoints_array[0], axis=0),
-                        np.expand_dims(keypoints_array[1], axis=0),
-                        np.expand_dims(keypoints_array[-1], axis=0),
-                        np.expand_dims(keypoints_array[-2], axis=0),
+
+            if FIXED_COURT_KEYPOINTS_LOAD_PATH is not None and os.path.exists(FIXED_COURT_KEYPOINTS_LOAD_PATH):
+                with open(FIXED_COURT_KEYPOINTS_LOAD_PATH, "r") as f:
+                    SELECTED_KEYPOINTS = json.load(f)
+                fixed_keypoints = Keypoints(
+                    [
+                        Keypoint(
+                            id=i,
+                            xy=tuple(float(x) for x in v)
+                        )
+                        for i, v in enumerate(SELECTED_KEYPOINTS)
+                    ]
+                )
+                keypoints_array = np.array(SELECTED_KEYPOINTS)
+                polygon_zone = sv.PolygonZone(
+                    np.concatenate(
+                        (
+                            np.expand_dims(keypoints_array[0], axis=0),
+                            np.expand_dims(keypoints_array[1], axis=0),
+                            np.expand_dims(keypoints_array[-1], axis=0),
+                            np.expand_dims(keypoints_array[-2], axis=0),
+                        ),
+                        axis=0
                     ),
-                    axis=0
-                ),
-                frame_resolution_wh=video_info.resolution_wh,
+                    frame_resolution_wh=video_info.resolution_wh,
+                )
+            else:
+                # No fixed keypoints file — detect keypoints per-frame; use full-frame polygon
+                fixed_keypoints = None
+                polygon_zone = sv.PolygonZone(
+                    np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32),
+                    frame_resolution_wh=video_info.resolution_wh,
+                )
+
+            st.session_state["fixed_keypoints_detection"] = fixed_keypoints
+
+            st.session_state["players_tracker"] = PlayerTracker(
+                PLAYERS_TRACKER_MODEL,
+                polygon_zone,
+                batch_size=PLAYERS_TRACKER_BATCH_SIZE,
+                annotator=PLAYERS_TRACKER_ANNOTATOR,
+                show_confidence=True,
+                load_path=PLAYERS_TRACKER_LOAD_PATH,
+                save_path=PLAYERS_TRACKER_SAVE_PATH,
             )
-        else:
-            # No fixed keypoints file — detect keypoints per-frame; use full-frame polygon
-            fixed_keypoints = None
-            polygon_zone = sv.PolygonZone(
-                np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32),
-                frame_resolution_wh=video_info.resolution_wh,
+
+            st.session_state["player_keypoints_tracker"] = PlayerKeypointsTracker(
+                PLAYERS_KEYPOINTS_TRACKER_MODEL,
+                train_image_size=PLAYERS_KEYPOINTS_TRACKER_TRAIN_IMAGE_SIZE,
+                batch_size=PLAYERS_KEYPOINTS_TRACKER_BATCH_SIZE,
+                load_path=PLAYERS_KEYPOINTS_TRACKER_LOAD_PATH,
+                save_path=PLAYERS_KEYPOINTS_TRACKER_SAVE_PATH,
             )
 
-        st.session_state["fixed_keypoints_detection"] = fixed_keypoints
+            st.session_state["ball_tracker"] = BallTracker(
+                BALL_TRACKER_MODEL,
+                BALL_TRACKER_INPAINT_MODEL,
+                batch_size=BALL_TRACKER_BATCH_SIZE,
+                median_max_sample_num=BALL_TRACKER_MEDIAN_MAX_SAMPLE_NUM,
+                median=None,
+                load_path=BALL_TRACKER_LOAD_PATH,
+                save_path=BALL_TRACKER_SAVE_PATH,
+            )
 
-        st.session_state["players_tracker"] = PlayerTracker(
-            PLAYERS_TRACKER_MODEL,
-            polygon_zone,
-            batch_size=PLAYERS_TRACKER_BATCH_SIZE,
-            annotator=PLAYERS_TRACKER_ANNOTATOR,
-            show_confidence=True,
-            load_path=PLAYERS_TRACKER_LOAD_PATH,
-            save_path=PLAYERS_TRACKER_SAVE_PATH,
-        )
+            st.session_state["keypoints_tracker"] = KeypointsTracker(
+                model_path=KEYPOINTS_TRACKER_MODEL,
+                batch_size=KEYPOINTS_TRACKER_BATCH_SIZE,
+                model_type=KEYPOINTS_TRACKER_MODEL_TYPE,
+                fixed_keypoints_detection=st.session_state["fixed_keypoints_detection"],
+                load_path=KEYPOINTS_TRACKER_LOAD_PATH,
+                save_path=KEYPOINTS_TRACKER_SAVE_PATH,
+            )
 
-        st.session_state["player_keypoints_tracker"] = PlayerKeypointsTracker(
-            PLAYERS_KEYPOINTS_TRACKER_MODEL,
-            train_image_size=PLAYERS_KEYPOINTS_TRACKER_TRAIN_IMAGE_SIZE,
-            batch_size=PLAYERS_KEYPOINTS_TRACKER_BATCH_SIZE,
-            load_path=PLAYERS_KEYPOINTS_TRACKER_LOAD_PATH,
-            save_path=PLAYERS_KEYPOINTS_TRACKER_SAVE_PATH,
-        )
+            runner = TrackingRunner(
+                trackers=[
+                    st.session_state["players_tracker"],
+                    st.session_state["player_keypoints_tracker"],
+                    st.session_state["ball_tracker"],
+                    st.session_state["keypoints_tracker"],
+                ],
+                video_path="tmp.mp4",
+                inference_path=OUTPUT_VIDEO_PATH,
+                start=0,
+                end=MAX_FRAMES,
+                collect_data=COLLECT_DATA,
+            )
 
-        st.session_state["ball_tracker"] = BallTracker(
-            BALL_TRACKER_MODEL,
-            BALL_TRACKER_INPAINT_MODEL,
-            batch_size=BALL_TRACKER_BATCH_SIZE,
-            median_max_sample_num=BALL_TRACKER_MEDIAN_MAX_SAMPLE_NUM,
-            median=None,
-            load_path=BALL_TRACKER_LOAD_PATH,
-            save_path=BALL_TRACKER_SAVE_PATH,
-        )
+            runner.run(progress_callback=progress_callback)
 
-        st.session_state["keypoints_tracker"] = KeypointsTracker(
-            model_path=KEYPOINTS_TRACKER_MODEL,
-            batch_size=KEYPOINTS_TRACKER_BATCH_SIZE,
-            model_type=KEYPOINTS_TRACKER_MODEL_TYPE,
-            fixed_keypoints_detection=st.session_state["fixed_keypoints_detection"],
-            load_path=KEYPOINTS_TRACKER_LOAD_PATH,
-            save_path=KEYPOINTS_TRACKER_SAVE_PATH,
-        )
+            st.session_state["runner"] = runner
 
-        runner = TrackingRunner(
-            trackers=[
-                st.session_state["players_tracker"],
-                st.session_state["player_keypoints_tracker"],
-                st.session_state["ball_tracker"],
-                st.session_state["keypoints_tracker"],
-            ],
-            video_path="tmp.mp4",
-            inference_path=OUTPUT_VIDEO_PATH,
-            start=0,
-            end=MAX_FRAMES,
-            collect_data=COLLECT_DATA,
-        )
+            df = runner.data_analytics.into_dataframe(runner.video_info.fps)
+            st.session_state["df"] = df
 
-        runner.run(progress_callback=progress_callback)
+            # Persist results for future sessions
+            video_id = hashlib.md5(video_url.encode()).hexdigest()[:12]
+            df.to_csv(f"{RESULTS_DIR}/{video_id}.csv", index=False)
+            _history = json.load(open(_index_path)) if os.path.exists(_index_path) else []
+            _history.append({
+                "video_id": video_id,
+                "url": video_url,
+                "processed_at": datetime.datetime.now().isoformat(),
+                "total_frames": runner.video_info.total_frames,
+                "fps": runner.video_info.fps,
+            })
+            with open(_index_path, "w") as _f:
+                json.dump(_history, _f, indent=2)
 
-        st.session_state["runner"] = runner
-
-        df = runner.data_analytics.into_dataframe(runner.video_info.fps)
-        st.session_state["df"] = df
-
-        # Persist results for future sessions
-        video_id = hashlib.md5(video_url.encode()).hexdigest()[:12]
-        df.to_csv(f"{RESULTS_DIR}/{video_id}.csv", index=False)
-        _history = json.load(open(_index_path)) if os.path.exists(_index_path) else []
-        _history.append({
-            "video_id": video_id,
-            "url": video_url,
-            "processed_at": datetime.datetime.now().isoformat(),
-            "total_frames": runner.video_info.total_frames,
-            "fps": runner.video_info.fps,
-        })
-        with open(_index_path, "w") as _f:
-            json.dump(_history, _f, indent=2)
-
-        progress_bar.progress(1.0)
-        status_text.text("Analysis complete.")
-        st.success("Done.")
+            _status.update(label="Analysis complete!", state="complete", expanded=False)
 
     st.session_state["video"] = pims.Video("tmp.mp4")
     st.subheader("Uploaded Video")
