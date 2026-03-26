@@ -103,14 +103,11 @@ jobs:
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
           IMAGE: ghcr.io/${{ github.repository }}:latest
         run: |
-          # Uses RunPod GraphQL API to launch an on-demand pod with the new image.
-          # For a persistent pod, replace podFindAndDeployOnDemand with podEditJob
-          # and supply your existing pod ID.
-          curl -s -X POST https://api.runpod.io/graphql \
+          RESPONSE=$(curl -s -X POST \
+            "https://api.runpod.io/graphql?api_key=${RUNPOD_API_KEY}" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
-            -d "{
-              \"query\": \"mutation { podFindAndDeployOnDemand(input: { cloudType: COMMUNITY, gpuCount: 1, volumeInGb: 20, containerDiskInGb: 20, minMemoryInGb: 16, minVcpuCount: 4, gpuTypeId: \\\"NVIDIA GeForce RTX 3090\\\", ports: \\\"8501/http\\\", imageName: \\\"${IMAGE}\\\" }) { id machineId } }\"
-            }" | tee /tmp/runpod_response.json
-          # Fail the step if RunPod returned an error
-          grep -q '"id"' /tmp/runpod_response.json
+            -d '{
+              "query": "mutation { podFindAndDeployOnDemand(input: { cloudType: COMMUNITY, gpuCount: 1, containerDiskInGb: 20, volumeInGb: 0, minMemoryInGb: 15, minVcpuCount: 2, gpuTypeId: \"NVIDIA GeForce RTX 3090\", ports: \"8501/http\", imageName: \"'"${IMAGE}"'\", name: \"padel-analytics\" }) { id machineId imageName } }"
+            }')
+          echo "RunPod response: ${RESPONSE}"
+          echo "${RESPONSE}" | grep -q '"id"' || (echo "ERROR: Pod launch failed" && exit 1)
