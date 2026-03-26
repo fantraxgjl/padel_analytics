@@ -258,7 +258,7 @@ if load_video or st.session_state["video"] is not None:
                         for i, v in enumerate(SELECTED_KEYPOINTS)
                     ]
                 )
-                keypoints_array = np.array(SELECTED_KEYPOINTS)
+                keypoints_array = np.array(SELECTED_KEYPOINTS, dtype=np.int32)
                 polygon_zone = sv.PolygonZone(
                     np.concatenate(
                         (
