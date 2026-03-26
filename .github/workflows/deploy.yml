@@ -7,8 +7,7 @@ on:
     branches: [main]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/padel-analytics
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────────
@@ -45,16 +44,12 @@ jobs:
         run: python -m pytest tests/ -v --tb=short
 
   # ──────────────────────────────────────────────────────────────────────────────
-  # 2. Build Docker image and push to GHCR (main branch only)
+  # 2. Build Docker image and push to Docker Hub (main branch only)
   # ──────────────────────────────────────────────────────────────────────────────
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -62,29 +57,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract image metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -101,16 +85,13 @@ jobs:
       - name: Trigger RunPod pod update
         env:
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
-          IMAGE: ghcr.io/${{ github.repository }}:latest
+          IMAGE: ${{ env.IMAGE_NAME }}:latest
         run: |
-          # Uses RunPod GraphQL API to launch an on-demand pod with the new image.
-          # For a persistent pod, replace podFindAndDeployOnDemand with podEditJob
-          # and supply your existing pod ID.
-          curl -s -X POST https://api.runpod.io/graphql \
+          RESPONSE=$(curl -s -X POST \
+            "https://api.runpod.io/graphql?api_key=${RUNPOD_API_KEY}" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
-            -d "{
-              \"query\": \"mutation { podFindAndDeployOnDemand(input: { cloudType: COMMUNITY, gpuCount: 1, volumeInGb: 20, containerDiskInGb: 20, minMemoryInGb: 16, minVcpuCount: 4, gpuTypeId: \\\"NVIDIA GeForce RTX 3090\\\", ports: \\\"8501/http\\\", imageName: \\\"${IMAGE}\\\" }) { id machineId } }\"
-            }" | tee /tmp/runpod_response.json
-          # Fail the step if RunPod returned an error
-          grep -q '"id"' /tmp/runpod_response.json
+            -d '{
+              "query": "mutation { podFindAndDeployOnDemand(input: { cloudType: COMMUNITY, gpuCount: 1, containerDiskInGb: 20, volumeInGb: 0, minMemoryInGb: 15, minVcpuCount: 2, gpuTypeId: \"NVIDIA GeForce RTX 3090\", ports: \"8501/http\", imageName: \"'"${IMAGE}"'\", name: \"padel-analytics\" }) { id machineId imageName } }"
+            }')
+          echo "RunPod response: ${RESPONSE}"
+          echo "${RESPONSE}" | grep -q '"id"' || (echo "ERROR: Pod launch failed" && exit 1)
