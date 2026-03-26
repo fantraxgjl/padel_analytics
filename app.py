@@ -241,8 +241,8 @@ if load_video or st.session_state["video"] is not None:
             video_info = sv.VideoInfo.from_video_path(video_path="tmp.mp4")
             fps, w, h, total_frames = (
                 video_info.fps,
-                video_info.width,
-                video_info.height,
+                int(video_info.width),
+                int(video_info.height),
                 video_info.total_frames,
             )
 
@@ -269,14 +269,14 @@ if load_video or st.session_state["video"] is not None:
                         ),
                         axis=0
                     ),
-                    frame_resolution_wh=video_info.resolution_wh,
+                    frame_resolution_wh=(w, h),
                 )
             else:
                 # No fixed keypoints file — detect keypoints per-frame; use full-frame polygon
                 fixed_keypoints = None
                 polygon_zone = sv.PolygonZone(
                     np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.int32),
-                    frame_resolution_wh=video_info.resolution_wh,
+                    frame_resolution_wh=(w, h),
                 )
 
             st.session_state["fixed_keypoints_detection"] = fixed_keypoints
