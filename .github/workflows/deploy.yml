@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/padel-analytics
+  IMAGE_NAME: fantraxgjl/padel-analytics
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────────
