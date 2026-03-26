@@ -71,27 +71,3 @@ jobs:
           tags: ${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  # ──────────────────────────────────────────────────────────────────────────────
-  # 3. Deploy to RunPod (main branch only, requires RUNPOD_API_KEY secret)
-  # ──────────────────────────────────────────────────────────────────────────────
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
-
-    steps:
-      - name: Trigger RunPod pod update
-        env:
-          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
-          IMAGE: ${{ env.IMAGE_NAME }}:latest
-        run: |
-          RESPONSE=$(curl -s -X POST \
-            "https://api.runpod.io/graphql?api_key=${RUNPOD_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "query": "mutation { podFindAndDeployOnDemand(input: { cloudType: ALL, gpuCount: 1, containerDiskInGb: 40, volumeInGb: 0, gpuTypeId: \"NVIDIA GeForce RTX 3090\", ports: \"8501/http\", imageName: \"'"${IMAGE}"'\", name: \"padel-analytics\" }) { id machineId imageName } }"
-            }')
-          echo "RunPod response: ${RESPONSE}"
-          echo "${RESPONSE}" | grep -q '"id"' || (echo "ERROR: Pod launch failed" && exit 1)
