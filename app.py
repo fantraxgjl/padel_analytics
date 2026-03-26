@@ -278,7 +278,7 @@ if upload_video or st.session_state["video"] is not None:
         st.header("Collected data")
         st.write("First 5 rows")
         st.dataframe(st.session_state["df"].head())
-        st.markdown(f"- Number of rows: {len(st.session_state["df"])}")
+        st.markdown(f"- Number of rows: {len(st.session_state['df'])}")
         # st.write("- Columns: ")
         # st.write(st.session_state["df"].columns)
 
