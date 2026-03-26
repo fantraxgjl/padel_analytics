@@ -3,8 +3,10 @@
 import json
 import numpy as np
 import os
+import re
 import subprocess
 import tempfile
+import requests
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -146,16 +148,37 @@ if "runner" not in st.session_state:
 
 st.title("Padel Analytics")
 
-uploaded_file = st.file_uploader("Upload video", type=["mp4", "avi", "mov", "mkv"])
-upload_video = uploaded_file is not None
+st.subheader("Load Video")
+video_url = st.text_input(
+    "Paste a Google Drive file link or direct video URL:",
+    placeholder="https://drive.google.com/file/d/FILE_ID/view  or  https://example.com/video.mp4",
+)
+load_video = st.button("Load Video")
 
-if upload_video or st.session_state["video"] is not None:
+if load_video or st.session_state["video"] is not None:
 
-    if upload_video:
+    if load_video:
+        if not video_url:
+            st.error("Please enter a video URL.")
+            st.stop()
+
         st.session_state["df"] = None
-        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_in:
-            tmp_in.write(uploaded_file.read())
-            tmp_input_path = tmp_in.name
+
+        with st.spinner("Downloading video..."):
+            tmp_input_path = tempfile.mktemp(suffix=".mp4")
+
+            gdrive_match = re.search(r"/file/d/([a-zA-Z0-9_-]+)", video_url)
+            if gdrive_match or "drive.google.com" in video_url:
+                import gdown
+                file_id = gdrive_match.group(1) if gdrive_match else video_url
+                gdown.download(id=file_id, output=tmp_input_path, quiet=False)
+            else:
+                response = requests.get(video_url, stream=True, timeout=300)
+                response.raise_for_status()
+                with open(tmp_input_path, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
         subprocess.run(
             ["ffmpeg", "-y", "-i", tmp_input_path, "-vcodec", "libx264", "tmp.mp4"],
             check=True,
