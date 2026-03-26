@@ -225,32 +225,37 @@ if load_video or st.session_state["video"] is not None:
         if FIXED_COURT_KEYPOINTS_LOAD_PATH is not None and os.path.exists(FIXED_COURT_KEYPOINTS_LOAD_PATH):
             with open(FIXED_COURT_KEYPOINTS_LOAD_PATH, "r") as f:
                 SELECTED_KEYPOINTS = json.load(f)
-        else:
-            FIXED_COURT_KEYPOINTS_LOAD_PATH = None
-
-        st.session_state["fixed_keypoints_detection"] = Keypoints(
-            [
-                Keypoint(
-                    id=i,
-                    xy=tuple(float(x) for x in v)
-                )
-                for i, v in enumerate(SELECTED_KEYPOINTS)
-            ]
-        )
-
-        keypoints_array = np.array(SELECTED_KEYPOINTS)
-        polygon_zone = sv.PolygonZone(
-            np.concatenate(
-                (
-                    np.expand_dims(keypoints_array[0], axis=0),
-                    np.expand_dims(keypoints_array[1], axis=0),
-                    np.expand_dims(keypoints_array[-1], axis=0),
-                    np.expand_dims(keypoints_array[-2], axis=0),
+            fixed_keypoints = Keypoints(
+                [
+                    Keypoint(
+                        id=i,
+                        xy=tuple(float(x) for x in v)
+                    )
+                    for i, v in enumerate(SELECTED_KEYPOINTS)
+                ]
+            )
+            keypoints_array = np.array(SELECTED_KEYPOINTS)
+            polygon_zone = sv.PolygonZone(
+                np.concatenate(
+                    (
+                        np.expand_dims(keypoints_array[0], axis=0),
+                        np.expand_dims(keypoints_array[1], axis=0),
+                        np.expand_dims(keypoints_array[-1], axis=0),
+                        np.expand_dims(keypoints_array[-2], axis=0),
+                    ),
+                    axis=0
                 ),
-                axis=0
-            ),
-            frame_resolution_wh=video_info.resolution_wh,
-        )
+                frame_resolution_wh=video_info.resolution_wh,
+            )
+        else:
+            # No fixed keypoints file — detect keypoints per-frame; use full-frame polygon
+            fixed_keypoints = None
+            polygon_zone = sv.PolygonZone(
+                np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32),
+                frame_resolution_wh=video_info.resolution_wh,
+            )
+
+        st.session_state["fixed_keypoints_detection"] = fixed_keypoints
 
         st.session_state["players_tracker"] = PlayerTracker(
             PLAYERS_TRACKER_MODEL,
