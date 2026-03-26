@@ -35,11 +35,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY . .
 
-# Download model weights at build time
-RUN pip install --quiet gdown && bash scripts/download_weights.sh
+# Install gdown for weight downloads at startup
+RUN pip install --quiet gdown
 
 # Create runtime directories that are gitignored
-RUN mkdir -p cache
+RUN mkdir -p cache weights/players_detection weights/ball_detection \
+             weights/players_keypoints_detection weights/court_keypoints_detection
 
 # Streamlit server settings
 ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \
@@ -49,7 +50,9 @@ ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \
 
 EXPOSE 8501
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+HEALTHCHECK --interval=60s --timeout=10s --start-period=300s --retries=3 \
     CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Download weights on first start, then launch the app
+CMD bash scripts/download_weights.sh && \
+    streamlit run app.py --server.port=8501 --server.address=0.0.0.0
