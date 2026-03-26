@@ -3,11 +3,23 @@
 import json
 import numpy as np
 import os
+import subprocess
+import tempfile
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 import supervision as sv
 import pims
+
+# Ensure required directories exist at startup
+for _d in (
+    "./cache",
+    "./weights/players_detection",
+    "./weights/ball_detection",
+    "./weights/players_keypoints_detection",
+    "./weights/court_keypoints_detection",
+):
+    os.makedirs(_d, exist_ok=True)
 
 from trackers import (
     Keypoint, 
@@ -134,18 +146,21 @@ if "runner" not in st.session_state:
 
 st.title("Padel Analytics")
 
-with st.form("run-video"):
-    upload_video_path = st.text_input(
-        "Upload video: ",
-        INPUT_VIDEO_PATH,
-    )
-    upload_video = st.form_submit_button("Upload")
+uploaded_file = st.file_uploader("Upload video", type=["mp4", "avi", "mov", "mkv"])
+upload_video = uploaded_file is not None
 
 if upload_video or st.session_state["video"] is not None:
 
     if upload_video:
         st.session_state["df"] = None
-        os.system(f"ffmpeg -y -i {upload_video_path} -vcodec libx264 tmp.mp4")
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_in:
+            tmp_in.write(uploaded_file.read())
+            tmp_input_path = tmp_in.name
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", tmp_input_path, "-vcodec", "libx264", "tmp.mp4"],
+            check=True,
+        )
+        os.unlink(tmp_input_path)
     
     if st.session_state["df"] is None:
 
