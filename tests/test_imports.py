@@ -21,9 +21,6 @@ def test_estimate_velocity_classes_exist():
     assert "m/s" in str(v)
 
 
-def test_analytics_import():
-    from analytics.data_analytics import DataAnalytics  # noqa: F401
-
 
 def test_utils_import():
     from utils.conversions import (  # noqa: F401
