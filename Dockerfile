@@ -5,14 +5,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# System dependencies
+# System dependencies (Python 3.10 is the Ubuntu 22.04 default — no PPA needed)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    && add-apt-repository ppa:deadsnakes/ppa \
-    && apt-get update && apt-get install -y --no-install-recommends \
-    python3.12 \
-    python3.12-dev \
-    python3.12-distutils \
+    python3 \
+    python3-dev \
+    python3-pip \
     ffmpeg \
     libgl1 \
     libglib2.0-0 \
@@ -20,10 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
-
-RUN ln -sf /usr/bin/python3.12 /usr/bin/python && \
-    ln -sf /usr/bin/pip3 /usr/bin/pip
+RUN ln -sf /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
 
