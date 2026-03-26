@@ -146,24 +146,36 @@ st.title("Padel Analytics")
 
 # --- Video history ---
 _index_path = f"{RESULTS_DIR}/index.json"
-if os.path.exists(_index_path):
-    with open(_index_path) as _f:
-        _history = json.load(_f)
-    if _history:
-        _options = {
-            f"{e['processed_at'][:10]} — {e['url'][:70]}": e
-            for e in reversed(_history)
-        }
-        _selected = st.selectbox(
-            "Load a previously analysed video:",
-            ["— analyse a new video —"] + list(_options.keys()),
+_history = json.load(open(_index_path)) if os.path.exists(_index_path) else []
+
+if _history:
+    _options = {
+        f"{e['processed_at'][:10]} — {e['url'][:70]}": e
+        for e in reversed(_history)
+    }
+    _selected = st.selectbox(
+        "Load a previously analysed video:",
+        ["— analyse a new video —"] + list(_options.keys()),
+    )
+    if _selected != "— analyse a new video —":
+        _entry = _options[_selected]
+        _csv_path = f"{RESULTS_DIR}/{_entry['video_id']}.csv"
+        if os.path.exists(_csv_path):
+            st.session_state["df"] = pd.read_csv(_csv_path)
+            st.success(f"Loaded results for {_entry['url'][:60]}")
+
+# --- In-progress analysis indicator ---
+_url_cache_path = "./cache/current_video_url.txt"
+if os.path.exists(_url_cache_path):
+    _in_progress_url = open(_url_cache_path).read().strip()
+    _completed_urls = {e["url"] for e in _history}
+    if _in_progress_url and _in_progress_url not in _completed_urls:
+        st.warning(
+            "**Analysis in progress or interrupted**\n\n"
+            f"`{_in_progress_url[:100]}`\n\n"
+            "Paste the URL below and click **Load Video** to resume — "
+            "the download and any completed trackers will be skipped automatically."
         )
-        if _selected != "— analyse a new video —":
-            _entry = _options[_selected]
-            _csv_path = f"{RESULTS_DIR}/{_entry['video_id']}.csv"
-            if os.path.exists(_csv_path):
-                st.session_state["df"] = pd.read_csv(_csv_path)
-                st.success(f"Loaded results for {_entry['url'][:60]}")
 
 st.subheader("Load Video")
 video_url = st.text_input(
