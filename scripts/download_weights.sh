@@ -44,7 +44,7 @@ success=false
 for attempt in $(seq 1 $max_attempts); do
     echo "Downloading weights from Google Drive (attempt $attempt/$max_attempts)..."
     if gdown --folder "https://drive.google.com/drive/folders/${FOLDER_ID}" \
-             -O weights/ --remaining-ok; then
+             -O . --remaining-ok; then
         success=true
         break
     fi
