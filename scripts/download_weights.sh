@@ -59,5 +59,20 @@ if ! $success; then
     exit 1
 fi
 
+# Verify all required files are actually present and non-empty
+all_present=true
+for f in "${REQUIRED_FILES[@]}"; do
+    if [ ! -s "$f" ]; then
+        echo "ERROR: Expected weight file missing after download: $f" >&2
+        all_present=false
+    fi
+done
+
+if ! $all_present; then
+    echo "ERROR: Download reported success but weight files are missing." >&2
+    echo "Check Google Drive folder permissions and quota." >&2
+    exit 1
+fi
+
 echo "Weights downloaded successfully."
 find weights/ -name "*.pt" -exec ls -lh {} \;
