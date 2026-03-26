@@ -127,6 +127,25 @@ def padel_court_2d(
     return fig
 
 
+def padel_court_2d_heatmap(x_data, y_data, colorscale="Hot", width=400):
+    """
+    Padel court with a 2D density heatmap overlay showing player position frequency.
+    """
+    fig = padel_court_2d(width=width)
+    fig.add_trace(
+        go.Histogram2dContour(
+            x=x_data,
+            y=y_data,
+            colorscale=colorscale,
+            reversescale=True,
+            opacity=0.7,
+            showscale=True,
+            ncontours=20,
+        )
+    )
+    return fig
+
+
 def plotly_fig2array(fig):
     """
     Convert a plotly figure to numpy array
