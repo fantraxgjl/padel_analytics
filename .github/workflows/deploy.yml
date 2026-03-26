@@ -91,7 +91,7 @@ jobs:
             "https://api.runpod.io/graphql?api_key=${RUNPOD_API_KEY}" \
             -H "Content-Type: application/json" \
             -d '{
-              "query": "mutation { podFindAndDeployOnDemand(input: { cloudType: COMMUNITY, gpuCount: 1, containerDiskInGb: 20, volumeInGb: 0, minMemoryInGb: 15, minVcpuCount: 2, gpuTypeId: \"NVIDIA GeForce RTX 3090\", ports: \"8501/http\", imageName: \"'"${IMAGE}"'\", name: \"padel-analytics\" }) { id machineId imageName } }"
+              "query": "mutation { podFindAndDeployOnDemand(input: { cloudType: ALL, gpuCount: 1, containerDiskInGb: 40, volumeInGb: 0, gpuTypeId: \"NVIDIA GeForce RTX 3090\", ports: \"8501/http\", imageName: \"'"${IMAGE}"'\", name: \"padel-analytics\" }) { id machineId imageName } }"
             }')
           echo "RunPod response: ${RESPONSE}"
           echo "${RESPONSE}" | grep -q '"id"' || (echo "ERROR: Pod launch failed" && exit 1)
