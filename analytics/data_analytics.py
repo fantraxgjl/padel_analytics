@@ -52,13 +52,13 @@ class DataPoint:
             return None
         
         players_ids = []
-        for i, player_pos in enumerate(deepcopy(self.players_position)):
+        valid_positions = []
+        for player_pos in self.players_position:
             player_id = player_pos.id
-
             if player_id in (1, 2, 3, 4):
                 players_ids.append(player_id)
-            else:
-                del self.players_position[i]
+                valid_positions.append(player_pos)
+        self.players_position = valid_positions
 
         if len(players_ids) != len(set(players_ids)):
             raise InvalidDataPoint("N-plicate player id")
