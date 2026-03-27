@@ -167,6 +167,14 @@ class KeypointsTracker(Tracker):
             self.model.eval()
         elif model_type == "yolo":
             self.model = YOLO(model_path)
+            # Fix Pose layers saved with old ultralytics that lack self.detect attribute.
+            try:
+                from ultralytics.nn.modules.head import Detect
+                for m in self.model.model.modules():
+                    if type(m).__name__ == "Pose" and not hasattr(m, "detect"):
+                        m.detect = Detect.forward
+            except Exception:
+                pass
         else:
             raise ValueError("Unknown model type")
 
