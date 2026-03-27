@@ -6,7 +6,7 @@ pims==0.7
 plotly==5.22.0
 seaborn==0.13.2
 supervision==0.22.0
-ultralytics==8.3.0
+ultralytics==8.2.0
 streamlit==1.37.0
 moviepy==1.0.3
 parse==1.20.2

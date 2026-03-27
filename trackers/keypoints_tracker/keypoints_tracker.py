@@ -247,7 +247,7 @@ class KeypointsTracker(Tracker):
         predictions = []
         for result in results:
             keypoints = []
-            for i, keypoint_detection in enumerate(result.keypoints.xy):
+            for i, keypoint_detection in enumerate(result.keypoints.xy.squeeze(0)):
                 keypoint = Keypoint(
                     id=points_mapper[i],
                     xy=(
