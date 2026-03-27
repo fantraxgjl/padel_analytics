@@ -255,12 +255,23 @@ class KeypointsTracker(Tracker):
         predictions = []
         for result in results:
             keypoints = []
-            for i, keypoint_detection in enumerate(result.keypoints.xy.squeeze(0)):
+            xy_tensor = result.keypoints.xy
+            # Normalise to [K, 2]: model may return [1, K, 2] (one court, K keypoints)
+            # or [K, 1, 2] (K detections each with 1 keypoint). Squeeze only when
+            # the first dim is exactly 1 to avoid collapsing K detections into nothing.
+            if xy_tensor.dim() == 3 and xy_tensor.shape[0] == 1:
+                xy_tensor = xy_tensor[0]  # [K, 2]
+            for i, keypoint_detection in enumerate(xy_tensor):
+                if i >= len(points_mapper):
+                    break
+                kp = keypoint_detection.reshape(-1)  # flatten [1,2] or [2] → [2]
+                if kp.shape[0] < 2:
+                    continue
                 keypoint = Keypoint(
                     id=points_mapper[i],
                     xy=(
-                        keypoint_detection[0].item() * ratio_x,
-                        keypoint_detection[1].item() * ratio_y,
+                        kp[0].item() * ratio_x,
+                        kp[1].item() * ratio_y,
                     ),
                 )
                 keypoints.append(keypoint)
