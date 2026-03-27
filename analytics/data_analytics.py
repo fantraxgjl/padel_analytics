@@ -236,6 +236,14 @@ class DataAnalytics:
         df = pd.DataFrame(self.into_dict())
         df["time"] = df["frame"] * (1/fps)
 
+        # Coerce player position columns to float so None becomes NaN and
+        # arithmetic operations (diff, eval) work on frames with missing players
+        for player_id in player_ids:
+            for pos in ("x", "y"):
+                df[f"player{player_id}_{pos}"] = pd.to_numeric(
+                    df[f"player{player_id}_{pos}"], errors="coerce"
+                )
+
         for frame_interval in frame_intervals:
             # Time in seconds between each frame for a given frame interval
             df[f"delta_time{frame_interval}"] = df["time"].diff(frame_interval)
