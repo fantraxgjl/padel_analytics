@@ -44,7 +44,7 @@ success=false
 for attempt in $(seq 1 $max_attempts); do
     echo "Downloading weights from Google Drive (attempt $attempt/$max_attempts)..."
     if gdown --folder "https://drive.google.com/drive/folders/${FOLDER_ID}" \
-             -O weights/ --remaining-ok; then
+             -O . --remaining-ok; then
         success=true
         break
     fi
@@ -56,6 +56,21 @@ done
 if ! $success; then
     echo "ERROR: Failed to download weights after $max_attempts attempts." >&2
     echo "Check network connectivity and Google Drive folder permissions." >&2
+    exit 1
+fi
+
+# Verify all required files are actually present and non-empty
+all_present=true
+for f in "${REQUIRED_FILES[@]}"; do
+    if [ ! -s "$f" ]; then
+        echo "ERROR: Expected weight file missing after download: $f" >&2
+        all_present=false
+    fi
+done
+
+if ! $all_present; then
+    echo "ERROR: Download reported success but weight files are missing." >&2
+    echo "Check Google Drive folder permissions and quota." >&2
     exit 1
 fi
 
