@@ -455,7 +455,8 @@ class ProjectedCourt:
                 ]
             ) 
         else:
-            raise ValueError("Unhandled number of keypoints detected")
+            print(f"projected_court: Skipping frame — {len(keypoints_detection)} keypoints detected (expected 12/18/22)")
+            return self.H
 
         if src_points.shape != dst_points.shape:
             raise InconsistentPredictedKeypoints("Don't have enough source points")
