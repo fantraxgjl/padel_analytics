@@ -146,6 +146,40 @@ def padel_court_2d_heatmap(x_data, y_data, colorscale="Hot", width=400):
     return fig
 
 
+def padel_court_2d_zones(width: int = 400):
+    """
+    Padel court with tactical zone boundary lines overlaid.
+
+    Green dotted lines at |y| = 3 m  (front / transition boundary)
+    Orange dotted lines at |y| = 6 m (transition / back-court boundary)
+    """
+    fig = padel_court_2d(width=width)
+
+    # Front / transition boundary at |y| = 3
+    for y_val in (-3, 3):
+        fig.add_trace(
+            go.Scatter(
+                x=[-5, 5],
+                y=[y_val, y_val],
+                mode="lines",
+                line=dict(color="rgba(0,200,100,0.7)", width=1, dash="dot"),
+            )
+        )
+
+    # Transition / back-court boundary at |y| = 6
+    for y_val in (-6, 6):
+        fig.add_trace(
+            go.Scatter(
+                x=[-5, 5],
+                y=[y_val, y_val],
+                mode="lines",
+                line=dict(color="rgba(255,140,0,0.7)", width=1, dash="dot"),
+            )
+        )
+
+    return fig
+
+
 def plotly_fig2array(fig):
     """
     Convert a plotly figure to numpy array

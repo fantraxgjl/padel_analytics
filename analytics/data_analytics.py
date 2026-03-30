@@ -34,13 +34,15 @@ class DataPoint:
     """
     Tracker objects data collected in a given frame
 
-    Attributes: 
+    Attributes:
         frame: frame of interest
         players_position: players position (meters) in the given frame
+        ball_position: ball position (meters) in the given frame, or None
     """
 
     frame: int = None
     players_position: list[PlayerPosition] = None
+    ball_position: Optional[tuple[float, float]] = None
 
     def validate(self) -> None:
 
@@ -72,6 +74,9 @@ class DataPoint:
             self.players_position = [player_position]
         else:
             self.players_position.append(player_position)
+
+    def add_ball_position(self, position: tuple[float, float]):
+        self.ball_position = position
 
     def sort_players_position(self) -> Optional[list[PlayerPosition]]:
         if self.players_position:
@@ -133,6 +138,13 @@ class DataAnalytics:
                 )
             )
         
+        for i in range(len(frames)):
+            frame = frames[i]
+            ball_x = data.get("ball_x", [None] * len(frames))[i]
+            ball_y = data.get("ball_y", [None] * len(frames))[i]
+            if ball_x is not None and ball_y is not None:
+                datapoints[i].ball_position = (float(ball_x), float(ball_y))
+
         instance.datapoints = datapoints
         instance.current_datapoint = None
 
@@ -149,6 +161,8 @@ class DataAnalytics:
             "player3_y": [],
             "player4_x": [],
             "player4_y": [],
+            "ball_x": [],
+            "ball_y": [],
         }
 
         for datapoint in self.datapoints:
@@ -159,11 +173,15 @@ class DataAnalytics:
             if players_position:
                 for player_position in players_position:
                     data[f"{player_position.key}_x"].append(
-                        player_position.position[0] 
+                        player_position.position[0]
                     )
                     data[f"{player_position.key}_y"].append(
-                        player_position.position[1] 
+                        player_position.position[1]
                     )
+
+            if datapoint.ball_position is not None:
+                data["ball_x"].append(datapoint.ball_position[0])
+                data["ball_y"].append(datapoint.ball_position[1])
 
             # Append missing values
             for k, v in data.items():
@@ -172,8 +190,8 @@ class DataAnalytics:
 
         print("data_analytics: missing values")
         for k, v in data.items():
-            print(f"data_analytics: {k} - {len([v for x in v if x is None])}/{len(v)}")
-  
+            print(f"data_analytics: {k} - {len([x for x in v if x is None])}/{len(v)}")
+
         return data
 
     def __len__(self) -> int:
@@ -193,8 +211,8 @@ class DataAnalytics:
         self.update()
 
     def add_player_position(
-        self, 
-        id: int, 
+        self,
+        id: int,
         position: tuple[float, float],
     ):
         self.current_datapoint.add_player_position(
@@ -203,6 +221,9 @@ class DataAnalytics:
                 position=position,
             )
         )
+
+    def add_ball_position(self, position: tuple[float, float]):
+        self.current_datapoint.add_ball_position(position)
 
     def into_dataframe(self, fps: int) -> pd.DataFrame:
         """
@@ -236,13 +257,25 @@ class DataAnalytics:
         df = pd.DataFrame(self.into_dict())
         df["time"] = df["frame"] * (1/fps)
 
-        # Coerce player position columns to float so None becomes NaN and
-        # arithmetic operations (diff, eval) work on frames with missing players
+        # Coerce player and ball position columns to float so None becomes NaN and
+        # arithmetic operations (diff, eval) work on frames with missing data
         for player_id in player_ids:
             for pos in ("x", "y"):
                 df[f"player{player_id}_{pos}"] = pd.to_numeric(
                     df[f"player{player_id}_{pos}"], errors="coerce"
                 )
+        for pos in ("x", "y"):
+            df[f"ball_{pos}"] = pd.to_numeric(df[f"ball_{pos}"], errors="coerce")
+
+        # Ball velocity (frame-interval=1 only)
+        for pos in ("x", "y"):
+            df[f"ball_delta{pos}1"] = df[f"ball_{pos}"].diff(1)
+        df["ball_Vx1"] = df["ball_deltax1"] / df["delta_time1"]
+        df["ball_Vy1"] = df["ball_deltay1"] / df["delta_time1"]
+        df["ball_Vnorm1"] = df.apply(
+            lambda row: norm(row["ball_Vx1"], row["ball_Vy1"]),
+            axis=1,
+        )
 
         for frame_interval in frame_intervals:
             # Time in seconds between each frame for a given frame interval
@@ -310,9 +343,69 @@ class DataAnalytics:
         return df
 
 
-        
+def zone_breakdown(df: pd.DataFrame, player_id: int) -> dict:
+    """
+    Returns % time spent in each court zone for a given player.
+
+    Zones (based on absolute y distance from net):
+        front:      |y| < 3 m  (net zone)
+        transition: 3 <= |y| < 6 m  (mid-court)
+        back:       |y| >= 6 m  (back court)
+    """
+    y = df[f"player{player_id}_y"].dropna()
+    if len(y) == 0:
+        return {"front": 0.0, "transition": 0.0, "back": 0.0}
+
+    abs_y = y.abs()
+    total = len(y)
+    front = int((abs_y < 3).sum())
+    transition = int(((abs_y >= 3) & (abs_y < 6)).sum())
+    back = int((abs_y >= 6).sum())
+
+    return {
+        "front": round(100 * front / total, 1),
+        "transition": round(100 * transition / total, 1),
+        "back": round(100 * back / total, 1),
+    }
 
 
+def partner_synchrony(
+    df: pd.DataFrame,
+    player_a: int,
+    player_b: int,
+    window: int = 60,
+) -> dict:
+    """
+    Computes synchrony metrics for a player pair over a rolling window.
 
-        
-    
+    Returns:
+        vertical_sync:       mean rolling Pearson r of Vy (forward/backward movement)
+        horizontal_sync:     mean rolling Pearson r of Vx (side-to-side movement)
+        avg_formation_width: median |x_a − x_b| in metres
+        rolling_vertical_sync:   list of per-frame rolling r values (for charts)
+        rolling_horizontal_sync: list of per-frame rolling r values (for charts)
+    """
+    vya = df[f"player{player_a}_Vy1"]
+    vyb = df[f"player{player_b}_Vy1"]
+    vxa = df[f"player{player_a}_Vx1"]
+    vxb = df[f"player{player_b}_Vx1"]
+    xa = df[f"player{player_a}_x"]
+    xb = df[f"player{player_b}_x"]
+
+    rolling_v = vya.rolling(window, min_periods=2).corr(vyb)
+    rolling_h = vxa.rolling(window, min_periods=2).corr(vxb)
+
+    vertical_sync = rolling_v.mean()
+    horizontal_sync = rolling_h.mean()
+    formation_width = (xa - xb).abs().median()
+
+    def _safe(v):
+        return round(float(v), 3) if not np.isnan(v) else None
+
+    return {
+        "vertical_sync": _safe(vertical_sync),
+        "horizontal_sync": _safe(horizontal_sync),
+        "avg_formation_width": _safe(formation_width) if formation_width is not None and not np.isnan(formation_width) else None,
+        "rolling_vertical_sync": rolling_v.tolist(),
+        "rolling_horizontal_sync": rolling_h.tolist(),
+    }

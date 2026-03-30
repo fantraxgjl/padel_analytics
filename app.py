@@ -37,7 +37,11 @@ from trackers import (
     TrackingRunner
 )
 from analytics import DataAnalytics
-from visualizations.padel_court import padel_court_2d, padel_court_2d_heatmap
+from analytics.data_analytics import zone_breakdown, partner_synchrony
+from analytics.hit_detection import detect_hits
+from analytics.shot_classifier import classify_hits
+from analytics.rally_analysis import segment_rallies, enrich_rallies, analyse_rallies_with_claude
+from visualizations.padel_court import padel_court_2d, padel_court_2d_heatmap, padel_court_2d_zones
 from estimate_velocity import BallVelocityEstimator, ImpactType
 from utils.video import save_video
 from config import *
@@ -137,7 +141,7 @@ def velocity_estimator(video_info: sv.VideoInfo):
 # --- Session state initialisation ---
 for _key in ("video", "df", "fixed_keypoints_detection",
              "players_keypoints_tracker", "players_tracker",
-             "ball_tracker", "keypoints_tracker", "runner"):
+             "ball_tracker", "keypoints_tracker", "runner", "analytics"):
     if _key not in st.session_state:
         st.session_state[_key] = None
 
@@ -160,8 +164,14 @@ if _history:
     if _selected != "— analyse a new video —":
         _entry = _options[_selected]
         _csv_path = f"{RESULTS_DIR}/{_entry['video_id']}.csv"
+        _analytics_path = f"{RESULTS_DIR}/{_entry['video_id']}_analytics.json"
         if os.path.exists(_csv_path):
             st.session_state["df"] = pd.read_csv(_csv_path)
+            if os.path.exists(_analytics_path):
+                with open(_analytics_path) as _af:
+                    st.session_state["analytics"] = json.load(_af)
+            else:
+                st.session_state["analytics"] = None
             st.success(f"Loaded results for {_entry['url'][:60]}")
 
 # --- In-progress analysis indicator ---
@@ -342,6 +352,38 @@ if load_video or st.session_state["video"] is not None:
             # Persist results for future sessions
             video_id = hashlib.md5(video_url.encode()).hexdigest()[:12]
             df.to_csv(f"{RESULTS_DIR}/{video_id}.csv", index=False)
+
+            # Pre-compute and cache analytics
+            _analytics_cache: dict = {
+                "zone_breakdown": {
+                    str(pid): zone_breakdown(df, pid)
+                    for pid in (1, 2, 3, 4)
+                },
+                "partner_synchrony": {
+                    "1_2": {
+                        k: v for k, v in partner_synchrony(df, 1, 2).items()
+                        if k in ("vertical_sync", "horizontal_sync", "avg_formation_width")
+                    },
+                    "3_4": {
+                        k: v for k, v in partner_synchrony(df, 3, 4).items()
+                        if k in ("vertical_sync", "horizontal_sync", "avg_formation_width")
+                    },
+                },
+            }
+
+            # Phase B: hit detection + rally segmentation (only if ball data present)
+            if "ball_x" in df.columns and df["ball_x"].notna().any():
+                _hits = detect_hits(df)
+                _hits = classify_hits(_hits, df)
+                _rallies = segment_rallies(df)
+                _rallies = enrich_rallies(_rallies, df, _hits)
+                _analytics_cache["hits"] = _hits
+                _analytics_cache["rallies"] = _rallies
+            _analytics_path = f"{RESULTS_DIR}/{video_id}_analytics.json"
+            with open(_analytics_path, "w") as _af:
+                json.dump(_analytics_cache, _af, indent=2)
+            st.session_state["analytics"] = _analytics_cache
+
             _history = json.load(open(_index_path)) if os.path.exists(_index_path) else []
             _history.append({
                 "video_id": video_id,
@@ -526,3 +568,251 @@ if load_video or st.session_state["video"] is not None:
             )
         )
         st.plotly_chart(court_time)
+
+        # ── Court Zone Breakdown ──────────────────────────────────────────────
+        st.header("Court Zone Breakdown")
+        st.caption(
+            "Front: |y| < 3 m (net zone)  ·  "
+            "Transition: 3–6 m  ·  "
+            "Back: |y| > 6 m"
+        )
+
+        _zone_data = {
+            pid: zone_breakdown(df, pid) for pid in (1, 2, 3, 4)
+        }
+
+        fig_zone = go.Figure()
+        _zone_colors = {
+            "front": "#22c55e",
+            "transition": "#f59e0b",
+            "back": "#ef4444",
+        }
+        for zone_key, color in _zone_colors.items():
+            fig_zone.add_trace(go.Bar(
+                name=zone_key.capitalize(),
+                x=[f"Player {pid}" for pid in (1, 2, 3, 4)],
+                y=[_zone_data[pid][zone_key] for pid in (1, 2, 3, 4)],
+                marker_color=color,
+                orientation="v",
+            ))
+        fig_zone.update_layout(
+            barmode="stack",
+            yaxis_title="% of time",
+            legend_title="Zone",
+            height=320,
+        )
+        st.plotly_chart(fig_zone, use_container_width=True)
+
+        # Court diagram with zone lines + player density per-player
+        st.subheader("Position heatmap with zone boundaries")
+        _zone_cols = st.columns(4)
+        for i, pid in enumerate((1, 2, 3, 4)):
+            with _zone_cols[i]:
+                st.caption(f"Player {pid}")
+                _zheat = padel_court_2d_zones(width=220)
+                _zheat.add_trace(
+                    go.Histogram2dContour(
+                        x=df[f"player{pid}_x"],
+                        y=df[f"player{pid}_y"] * -1,
+                        colorscale="Hot",
+                        reversescale=True,
+                        opacity=0.65,
+                        showscale=False,
+                        ncontours=15,
+                    )
+                )
+                _zheat.update_layout(height=440, showlegend=False)
+                st.plotly_chart(_zheat, use_container_width=False)
+
+        # ── Partner Synchrony ─────────────────────────────────────────────────
+        st.header("Partner Synchrony")
+        st.caption(
+            "Rolling Pearson correlation (60-frame window) between partners' "
+            "velocity components. +1 = perfectly in sync, −1 = perfectly mirrored."
+        )
+
+        for pair_label, pa, pb in [("Team A (Players 1 & 2)", 1, 2), ("Team B (Players 3 & 4)", 3, 4)]:
+            st.subheader(pair_label)
+            _sync = partner_synchrony(df, pa, pb)
+
+            _sc1, _sc2, _sc3 = st.columns(3)
+            with _sc1:
+                _v = _sync["vertical_sync"]
+                st.metric("Vertical sync (Vy)", f"{_v:.2f}" if _v is not None else "N/A",
+                          help="Mean rolling correlation of forward/backward velocity")
+            with _sc2:
+                _h = _sync["horizontal_sync"]
+                st.metric("Horizontal sync (Vx)", f"{_h:.2f}" if _h is not None else "N/A",
+                          help="Mean rolling correlation of side-to-side velocity")
+            with _sc3:
+                _w = _sync["avg_formation_width"]
+                st.metric("Avg formation width", f"{_w:.1f} m" if _w is not None else "N/A",
+                          help="Median lateral distance between partners")
+
+            fig_sync = go.Figure()
+            fig_sync.add_trace(go.Scatter(
+                x=df["time"],
+                y=_sync["rolling_vertical_sync"],
+                mode="lines",
+                name="Vertical sync (Vy)",
+                line=dict(color="#6366f1"),
+            ))
+            fig_sync.add_trace(go.Scatter(
+                x=df["time"],
+                y=_sync["rolling_horizontal_sync"],
+                mode="lines",
+                name="Horizontal sync (Vx)",
+                line=dict(color="#f43f5e"),
+            ))
+            fig_sync.update_layout(
+                yaxis=dict(title="Pearson r", range=[-1.1, 1.1]),
+                xaxis_title="Time (s)",
+                height=280,
+                legend=dict(orientation="h", y=1.1),
+            )
+            fig_sync.add_hline(y=0, line_dash="dot", line_color="gray", opacity=0.4)
+            st.plotly_chart(fig_sync, use_container_width=True)
+
+        # ── Hit Counting & Shot Types ─────────────────────────────────────────
+        st.header("Hit Counting & Shot Types")
+
+        _has_ball_data = "ball_x" in df.columns and df["ball_x"].notna().any()
+        if not _has_ball_data:
+            st.info(
+                "Ball position data not available in this CSV. "
+                "Re-run the video analysis pipeline to collect ball court projections."
+            )
+        else:
+            _analytics = st.session_state.get("analytics") or {}
+            _hits = _analytics.get("hits")
+            if _hits is None:
+                _hits = detect_hits(df)
+                _hits = classify_hits(_hits, df)
+
+            if not _hits:
+                st.write("No hit events detected.")
+            else:
+                # Hit count per player
+                st.subheader("Hits per player")
+                _hit_counts = {pid: 0 for pid in (1, 2, 3, 4)}
+                for h in _hits:
+                    _hit_counts[h["player_id"]] += 1
+                _hc_cols = st.columns(4)
+                for i, pid in enumerate((1, 2, 3, 4)):
+                    with _hc_cols[i]:
+                        st.metric(f"Player {pid}", _hit_counts[pid], help="Detected hit events")
+
+                # Shot type distribution
+                st.subheader("Shot type distribution")
+                _all_shot_types = sorted(set(h.get("shot_type", "unknown") for h in _hits))
+                _sc_data: dict[str, list] = {stype: [0, 0, 0, 0] for stype in _all_shot_types}
+                for h in _hits:
+                    _sc_data[h.get("shot_type", "unknown")][h["player_id"] - 1] += 1
+
+                fig_shots = go.Figure()
+                _shot_palette = [
+                    "#6366f1", "#22c55e", "#f59e0b", "#ef4444",
+                    "#14b8a6", "#f97316", "#8b5cf6", "#ec4899",
+                ]
+                for si, shot_name in enumerate(_all_shot_types):
+                    fig_shots.add_trace(go.Bar(
+                        name=shot_name,
+                        x=[f"Player {pid}" for pid in (1, 2, 3, 4)],
+                        y=_sc_data[shot_name],
+                        marker_color=_shot_palette[si % len(_shot_palette)],
+                    ))
+                fig_shots.update_layout(
+                    barmode="stack",
+                    yaxis_title="Hit count",
+                    legend_title="Shot type",
+                    height=320,
+                )
+                st.plotly_chart(fig_shots, use_container_width=True)
+
+                # Hit timeline
+                st.subheader("Hit timeline")
+                fig_hits = go.Figure()
+                for pid in (1, 2, 3, 4):
+                    player_hits = [h for h in _hits if h["player_id"] == pid]
+                    if player_hits:
+                        fig_hits.add_trace(go.Scatter(
+                            x=[h["time"] for h in player_hits],
+                            y=[pid] * len(player_hits),
+                            mode="markers",
+                            name=f"Player {pid}",
+                            marker=dict(size=8, symbol="circle"),
+                            text=[h.get("shot_type", "") for h in player_hits],
+                        ))
+                fig_hits.update_layout(
+                    yaxis=dict(
+                        tickvals=[1, 2, 3, 4],
+                        ticktext=["Player 1", "Player 2", "Player 3", "Player 4"],
+                        title="",
+                    ),
+                    xaxis_title="Time (s)",
+                    height=240,
+                )
+                st.plotly_chart(fig_hits, use_container_width=True)
+
+        # ── AI Rally Analysis ─────────────────────────────────────────────────
+        st.header("AI Rally Analysis")
+
+        if not _has_ball_data:
+            st.info("Requires ball position data — re-run pipeline first.")
+        else:
+            _analytics = st.session_state.get("analytics") or {}
+            _cached_ai = _analytics.get("ai_analysis")
+
+            if _cached_ai:
+                _ai_result = _cached_ai
+                st.caption("Loaded from cache.")
+            else:
+                _run_ai = st.button("Run AI Analysis", help="Calls Claude API — uses ANTHROPIC_API_KEY")
+                _ai_result = None
+                if _run_ai:
+                    with st.spinner("Analysing with Claude..."):
+                        _rallies_for_ai = _analytics.get("rallies") or []
+                        _zone_for_ai = _analytics.get("zone_breakdown") or {
+                            str(pid): zone_breakdown(df, pid) for pid in (1, 2, 3, 4)
+                        }
+                        _sync_for_ai = _analytics.get("partner_synchrony") or {
+                            "1_2": {k: v for k, v in partner_synchrony(df, 1, 2).items()
+                                    if k in ("vertical_sync", "horizontal_sync", "avg_formation_width")},
+                            "3_4": {k: v for k, v in partner_synchrony(df, 3, 4).items()
+                                    if k in ("vertical_sync", "horizontal_sync", "avg_formation_width")},
+                        }
+                        _ai_result = analyse_rallies_with_claude(
+                            rallies=_rallies_for_ai,
+                            zone_data=_zone_for_ai,
+                            sync_data=_sync_for_ai,
+                        )
+                        # Cache to JSON
+                        if "error" not in _ai_result:
+                            _analytics["ai_analysis"] = _ai_result
+                            _vid_id = hashlib.md5(
+                                (st.session_state.get("current_video_url") or "").encode()
+                            ).hexdigest()[:12]
+                            _ai_json_path = f"{RESULTS_DIR}/{_vid_id}_analytics.json"
+                            if os.path.exists(_ai_json_path):
+                                with open(_ai_json_path) as _ajf:
+                                    _existing = json.load(_ajf)
+                                _existing["ai_analysis"] = _ai_result
+                                with open(_ai_json_path, "w") as _ajf:
+                                    json.dump(_existing, _ajf, indent=2)
+                            st.session_state["analytics"] = _analytics
+
+            if _ai_result:
+                if "error" in _ai_result:
+                    st.error(_ai_result["error"])
+                else:
+                    st.subheader("Per-player coaching feedback")
+                    _fb_cols = st.columns(2)
+                    _feedback = _ai_result.get("player_feedback", {})
+                    for i, pid in enumerate((1, 2, 3, 4)):
+                        with _fb_cols[i % 2]:
+                            st.markdown(f"**Player {pid}**")
+                            st.write(_feedback.get(str(pid), "No feedback available."))
+
+                    st.subheader("Overall tactical patterns")
+                    for pattern in _ai_result.get("overall_patterns", []):
+                        st.markdown(f"- {pattern}")
