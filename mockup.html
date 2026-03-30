@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Padel Analytics — Dashboard Mockup</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0e1117; color: #fafafa; }
+  .app { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
+  h1 { font-size: 2rem; font-weight: 700; margin-bottom: 24px; }
+  h2 { font-size: 1.4rem; font-weight: 600; margin: 36px 0 12px; border-top: 1px solid #2d3139; padding-top: 20px; }
+  h3 { font-size: 1.05rem; font-weight: 600; margin: 20px 0 10px; }
+  p.caption { font-size: 0.82rem; color: #a0a0b0; margin-bottom: 12px; }
+  .cols4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+  .cols2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 16px; }
+  .metric-card { background: #1c1f27; border: 1px solid #2d3139; border-radius: 8px; padding: 14px 16px; }
+  .metric-label { font-size: 0.78rem; color: #9094a0; margin-bottom: 4px; }
+  .metric-value { font-size: 1.6rem; font-weight: 700; color: #fff; }
+  .metric-sub { font-size: 0.78rem; color: #9094a0; margin-top: 2px; }
+  .chart-box { background: #1c1f27; border: 1px solid #2d3139; border-radius: 8px; padding: 8px; margin-bottom: 16px; }
+  .chart-box-wide { margin-bottom: 20px; }
+  .info-banner { background: #1a2744; border: 1px solid #2a4080; border-radius: 8px; padding: 12px 16px; color: #80a8f0; font-size: 0.88rem; margin: 12px 0 20px; }
+  .ai-card { background: #1c1f27; border: 1px solid #2d3139; border-radius: 8px; padding: 16px; }
+  .ai-card h4 { font-size: 0.92rem; font-weight: 700; margin-bottom: 8px; color: #c084fc; }
+  .ai-card p { font-size: 0.88rem; line-height: 1.55; color: #d0d0e0; }
+  .pattern-item { font-size: 0.88rem; color: #d0d0e0; line-height: 1.6; padding: 4px 0; }
+  .pattern-item::before { content: "• "; color: #6366f1; font-weight: 700; }
+  .section-label { display: inline-block; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #9094a0; border: 1px solid #2d3139; border-radius: 4px; padding: 2px 7px; margin-bottom: 14px; }
+  .sync-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+  .badge { display: inline-block; font-size: 0.7rem; font-weight: 700; border-radius: 4px; padding: 2px 7px; margin-right: 4px; }
+  .badge-green { background: #14532d; color: #4ade80; }
+  .badge-amber { background: #431407; color: #fb923c; }
+  .badge-blue  { background: #1e3a5f; color: #60a5fa; }
+  .stacked-label { font-size: 0.78rem; color: #9094a0; margin-bottom: 4px; }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid #2d3139; margin-bottom: 16px; }
+  .tab { padding: 8px 18px; font-size: 0.88rem; color: #9094a0; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: #fff; border-bottom-color: #6366f1; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <h1>Padel Analytics</h1>
+
+  <!-- ── Match Summary ── -->
+  <h2>Match Summary</h2>
+  <div class="cols4">
+    <div class="metric-card"><div class="metric-label">Player 1</div><div class="metric-value">1 247 m</div><div class="metric-sub">Total distance</div></div>
+    <div class="metric-card"><div class="metric-label">Player 2</div><div class="metric-value">1 183 m</div><div class="metric-sub">Total distance</div></div>
+    <div class="metric-card"><div class="metric-label">Player 3</div><div class="metric-value">1 312 m</div><div class="metric-sub">Total distance</div></div>
+    <div class="metric-card"><div class="metric-label">Player 4</div><div class="metric-value">1 091 m</div><div class="metric-sub">Total distance</div></div>
+  </div>
+  <div class="cols4">
+    <div class="metric-card"><div class="metric-label">Max speed</div><div class="metric-value">24.3 km/h</div></div>
+    <div class="metric-card"><div class="metric-label">Max speed</div><div class="metric-value">21.8 km/h</div></div>
+    <div class="metric-card"><div class="metric-label">Max speed</div><div class="metric-value">26.1 km/h</div></div>
+    <div class="metric-card"><div class="metric-label">Max speed</div><div class="metric-value">19.4 km/h</div></div>
+  </div>
+
+  <!-- ── Court Zone Breakdown ── -->
+  <h2>Court Zone Breakdown</h2>
+  <p class="caption">Front: |y| &lt; 3 m (net zone)  ·  Transition: 3–6 m  ·  Back: |y| &gt; 6 m</p>
+  <div class="chart-box chart-box-wide"><div id="zone-bar"></div></div>
+
+  <h3>Position heatmap with zone boundaries</h3>
+  <div class="cols4">
+    <div class="chart-box"><div id="heat1" style="height:320px"></div></div>
+    <div class="chart-box"><div id="heat2" style="height:320px"></div></div>
+    <div class="chart-box"><div id="heat3" style="height:320px"></div></div>
+    <div class="chart-box"><div id="heat4" style="height:320px"></div></div>
+  </div>
+
+  <!-- ── Partner Synchrony ── -->
+  <h2>Partner Synchrony</h2>
+  <p class="caption">Rolling Pearson correlation (60-frame window) between partners' velocity components. +1 = perfectly in sync, −1 = perfectly mirrored.</p>
+
+  <h3>Team A (Players 1 &amp; 2)</h3>
+  <div class="sync-row">
+    <div class="metric-card"><div class="metric-label">Vertical sync (Vy)</div><div class="metric-value">+0.71</div><div class="metric-sub">Forward/backward</div></div>
+    <div class="metric-card"><div class="metric-label">Horizontal sync (Vx)</div><div class="metric-value">+0.58</div><div class="metric-sub">Side-to-side</div></div>
+    <div class="metric-card"><div class="metric-label">Avg formation width</div><div class="metric-value">2.4 m</div><div class="metric-sub">Median lateral gap</div></div>
+  </div>
+  <div class="chart-box"><div id="sync-a"></div></div>
+
+  <h3>Team B (Players 3 &amp; 4)</h3>
+  <div class="sync-row">
+    <div class="metric-card"><div class="metric-label">Vertical sync (Vy)</div><div class="metric-value">+0.48</div><div class="metric-sub">Forward/backward</div></div>
+    <div class="metric-card"><div class="metric-label">Horizontal sync (Vx)</div><div class="metric-value">+0.33</div><div class="metric-sub">Side-to-side</div></div>
+    <div class="metric-card"><div class="metric-label">Avg formation width</div><div class="metric-value">3.1 m</div><div class="metric-sub">Median lateral gap</div></div>
+  </div>
+  <div class="chart-box"><div id="sync-b"></div></div>
+
+  <!-- ── Hit Counting & Shot Types ── -->
+  <h2>Hit Counting &amp; Shot Types</h2>
+
+  <h3>Hits per player</h3>
+  <div class="cols4">
+    <div class="metric-card"><div class="metric-label">Player 1</div><div class="metric-value">47</div><div class="metric-sub">Detected hit events</div></div>
+    <div class="metric-card"><div class="metric-label">Player 2</div><div class="metric-value">52</div><div class="metric-sub">Detected hit events</div></div>
+    <div class="metric-card"><div class="metric-label">Player 3</div><div class="metric-value">44</div><div class="metric-sub">Detected hit events</div></div>
+    <div class="metric-card"><div class="metric-label">Player 4</div><div class="metric-value">39</div><div class="metric-sub">Detected hit events</div></div>
+  </div>
+
+  <h3>Shot type distribution</h3>
+  <div class="chart-box chart-box-wide"><div id="shots-bar"></div></div>
+
+  <h3>Hit timeline</h3>
+  <div class="chart-box"><div id="hit-timeline"></div></div>
+
+  <!-- ── AI Rally Analysis ── -->
+  <h2>AI Rally Analysis</h2>
+  <p class="caption">Loaded from cache · 34 rallies detected</p>
+
+  <h3>Per-player coaching feedback</h3>
+  <div class="cols2">
+    <div class="ai-card">
+      <h4>Player 1</h4>
+      <p>Strong net presence — spends 61% of time in the front zone, the highest of all four players. Focus on reducing unforced errors on the bandeja by holding the elbow higher at contact. Your formation width with Player 2 is good at 2.4 m; maintain this when defending lobs.</p>
+    </div>
+    <div class="ai-card">
+      <h4>Player 2</h4>
+      <p>Excellent vertical sync with Player 1 (r = 0.71) shows strong tactical movement coordination. You are hitting more viboras than any other player — consider mixing in more bandejas on slower lobs to keep opponents guessing. Increase back-court time slightly to defend deep lobs.</p>
+    </div>
+    <div class="ai-card">
+      <h4>Player 3</h4>
+      <p>Covers the most distance at 1 312 m — indicating a reactive rather than proactive positioning style. Work on anticipating lob trajectories earlier to reduce the number of defensive globos (currently 38% of shots). Synchrony with Player 4 can be improved, particularly horizontal movement.</p>
+    </div>
+    <div class="ai-card">
+      <h4>Player 4</h4>
+      <p>Lowest hit count (39) suggests a passive role; look to take more initiative at the net. Max speed of 19.4 km/h is the lowest — focus on explosive first-step reactions. The team's formation width of 3.1 m is wider than ideal; closing toward 2.5 m would reduce the central corridor gap.</p>
+    </div>
+  </div>
+
+  <h3>Overall tactical patterns</h3>
+  <div style="background:#1c1f27;border:1px solid #2d3139;border-radius:8px;padding:16px;margin-top:8px">
+    <div class="pattern-item">Team A dominates the net zone for 58% of play while Team B is predominantly back-court (64%), creating a consistent asymmetry exploited by Team A through smashes and volleys.</div>
+    <div class="pattern-item">Rally lengths are short (median 4.2 s, 3 hits), suggesting high-pace point construction with few extended baseline exchanges.</div>
+    <div class="pattern-item">Player 3 is the primary target of lobs from Team A — 71% of globos are directed to the Player 3 side, indicating Team A has identified a positional weakness.</div>
+    <div class="pattern-item">Team B's below-average horizontal sync (r = 0.33) leaves a central corridor gap that Team A exploits with chiquitas in 12 of 34 rallies.</div>
+    <div class="pattern-item">Both teams show higher synchrony in the first half of the match; sync scores drop noticeably after the 4-minute mark, consistent with fatigue or tactical disruption.</div>
+  </div>
+
+</div>
+
+<script>
+const LAYOUT_BASE = {
+  paper_bgcolor: '#1c1f27',
+  plot_bgcolor: '#1c1f27',
+  font: { color: '#d0d0e0', size: 11 },
+  margin: { l: 50, r: 20, t: 28, b: 40 },
+};
+
+// ── Zone stacked bar ──
+Plotly.newPlot('zone-bar', [
+  { name: 'Front', x: ['Player 1','Player 2','Player 3','Player 4'], y: [61, 54, 18, 22], type: 'bar', marker: { color: '#22c55e' } },
+  { name: 'Transition', x: ['Player 1','Player 2','Player 3','Player 4'], y: [24, 28, 18, 20], type: 'bar', marker: { color: '#f59e0b' } },
+  { name: 'Back', x: ['Player 1','Player 2','Player 3','Player 4'], y: [15, 18, 64, 58], type: 'bar', marker: { color: '#ef4444' } },
+], {
+  ...LAYOUT_BASE,
+  barmode: 'stack',
+  yaxis: { title: '% of time', gridcolor: '#2d3139' },
+  legend: { orientation: 'h', y: 1.12 },
+  height: 300,
+});
+
+// ── Court heatmaps with zone lines ──
+function courtTraces(xData, yData) {
+  const courtLines = [
+    { x: [-5,5], y: [-10,-10], line: { color:'#555', width:3 } },
+    { x: [-5,5], y: [-7,-7],   line: { color:'#555', width:1 } },
+    { x: [-5,5], y: [0,0],     line: { color:'#555', width:1, dash:'dash' } },
+    { x: [-5,5], y: [7,7],     line: { color:'#555', width:1 } },
+    { x: [-5,5], y: [10,10],   line: { color:'#555', width:3 } },
+    { x: [-5,-5], y: [-10,10], line: { color:'#555', width:3 } },
+    { x: [5,5],   y: [-10,10], line: { color:'#555', width:3 } },
+    { x: [0,0],   y: [-7,7],   line: { color:'#555', width:1 } },
+    // zone lines
+    { x: [-5,5], y: [-3,-3], line: { color:'rgba(34,197,94,0.7)', width:1, dash:'dot' } },
+    { x: [-5,5], y: [3,3],   line: { color:'rgba(34,197,94,0.7)', width:1, dash:'dot' } },
+    { x: [-5,5], y: [-6,-6], line: { color:'rgba(251,146,60,0.7)', width:1, dash:'dot' } },
+    { x: [-5,5], y: [6,6],   line: { color:'rgba(251,146,60,0.7)', width:1, dash:'dot' } },
+  ].map(l => ({ ...l, mode:'lines', showlegend:false, hoverinfo:'skip', type:'scatter' }));
+
+  const density = {
+    type: 'histogram2dcontour',
+    x: xData, y: yData,
+    colorscale: 'Hot', reversescale: true,
+    opacity: 0.65, showscale: false, ncontours: 12,
+  };
+  return [...courtLines, density];
+}
+
+const courtLayout = (title) => ({
+  ...LAYOUT_BASE,
+  title: { text: title, font: { size: 11 } },
+  xaxis: { range: [-5,5], showgrid: false, zeroline: false, showticklabels: false },
+  yaxis: { range: [-10,10], showgrid: false, zeroline: false, showticklabels: false },
+  height: 320, width: 240,
+  margin: { l: 8, r: 8, t: 28, b: 8 },
+  showlegend: false,
+});
+
+// Simulated position data
+function gauss(cx,cy,sx,sy,n){
+  const xs=[],ys=[];
+  for(let i=0;i<n;i++){
+    xs.push(cx + sx*(Math.random()+Math.random()+Math.random()-1.5)*0.9);
+    ys.push(cy + sy*(Math.random()+Math.random()+Math.random()-1.5)*0.9);
+  }
+  return {xs,ys};
+}
+const p1=gauss(1,5,2,2.5,300), p2=gauss(-1,5,2,2.5,300),
+      p3=gauss(1,-5,2,2.5,300), p4=gauss(-1,-5,2,2.5,300);
+
+Plotly.newPlot('heat1', courtTraces(p1.xs, p1.ys), courtLayout('Player 1'));
+Plotly.newPlot('heat2', courtTraces(p2.xs, p2.ys), courtLayout('Player 2'));
+Plotly.newPlot('heat3', courtTraces(p3.xs, p3.ys), courtLayout('Player 3'));
+Plotly.newPlot('heat4', courtTraces(p4.xs, p4.ys), courtLayout('Player 4'));
+
+// ── Synchrony rolling charts ──
+const T = Array.from({length:300}, (_,i) => i*0.2);
+function rollingSync(base, noise) {
+  return T.map((t,i) => Math.max(-1, Math.min(1,
+    base + noise*Math.sin(i*0.15) + (Math.random()-0.5)*0.18
+  )));
+}
+
+Plotly.newPlot('sync-a', [
+  { x:T, y:rollingSync(0.71,0.2), mode:'lines', name:'Vertical sync (Vy)', line:{color:'#6366f1'} },
+  { x:T, y:rollingSync(0.58,0.25), mode:'lines', name:'Horizontal sync (Vx)', line:{color:'#f43f5e'} },
+  { x:[T[0],T[T.length-1]], y:[0,0], mode:'lines', line:{color:'#555',dash:'dot',width:1}, showlegend:false },
+], {
+  ...LAYOUT_BASE,
+  yaxis: { title:'Pearson r', range:[-1.1,1.1], gridcolor:'#2d3139' },
+  xaxis: { title:'Time (s)', gridcolor:'#2d3139' },
+  legend: { orientation:'h', y:1.1 },
+  height: 220,
+});
+
+Plotly.newPlot('sync-b', [
+  { x:T, y:rollingSync(0.48,0.3), mode:'lines', name:'Vertical sync (Vy)', line:{color:'#6366f1'} },
+  { x:T, y:rollingSync(0.33,0.35), mode:'lines', name:'Horizontal sync (Vx)', line:{color:'#f43f5e'} },
+  { x:[T[0],T[T.length-1]], y:[0,0], mode:'lines', line:{color:'#555',dash:'dot',width:1}, showlegend:false },
+], {
+  ...LAYOUT_BASE,
+  yaxis: { title:'Pearson r', range:[-1.1,1.1], gridcolor:'#2d3139' },
+  xaxis: { title:'Time (s)', gridcolor:'#2d3139' },
+  legend: { orientation:'h', y:1.1 },
+  height: 220,
+});
+
+// ── Shot distribution ──
+Plotly.newPlot('shots-bar', [
+  { name:'smash',    x:['P1','P2','P3','P4'], y:[8,6,3,2],   type:'bar', marker:{color:'#6366f1'} },
+  { name:'bandeja',  x:['P1','P2','P3','P4'], y:[7,9,4,3],   type:'bar', marker:{color:'#22c55e'} },
+  { name:'vibora',   x:['P1','P2','P3','P4'], y:[6,8,2,1],   type:'bar', marker:{color:'#f59e0b'} },
+  { name:'volley',   x:['P1','P2','P3','P4'], y:[9,11,3,4],  type:'bar', marker:{color:'#14b8a6'} },
+  { name:'chiquita', x:['P1','P2','P3','P4'], y:[5,4,8,6],   type:'bar', marker:{color:'#f97316'} },
+  { name:'globo',    x:['P1','P2','P3','P4'], y:[4,5,16,15], type:'bar', marker:{color:'#8b5cf6'} },
+  { name:'bajada',   x:['P1','P2','P3','P4'], y:[3,4,5,5],   type:'bar', marker:{color:'#ec4899'} },
+  { name:'unknown',  x:['P1','P2','P3','P4'], y:[5,5,3,3],   type:'bar', marker:{color:'#555'} },
+], {
+  ...LAYOUT_BASE,
+  barmode: 'stack',
+  yaxis: { title:'Hit count', gridcolor:'#2d3139' },
+  legend: { orientation:'h', y:1.12 },
+  height: 300,
+});
+
+// ── Hit timeline ──
+function randomHits(n, pStart, pEnd) {
+  return Array.from({length:n}, () => pStart + Math.random()*(pEnd-pStart));
+}
+Plotly.newPlot('hit-timeline', [
+  { x:randomHits(47,0,60), y:Array(47).fill(1), mode:'markers', name:'Player 1',
+    marker:{color:'#6366f1',size:9,symbol:'circle'} },
+  { x:randomHits(52,0,60), y:Array(52).fill(2), mode:'markers', name:'Player 2',
+    marker:{color:'#22c55e',size:9,symbol:'circle'} },
+  { x:randomHits(44,0,60), y:Array(44).fill(3), mode:'markers', name:'Player 3',
+    marker:{color:'#f59e0b',size:9,symbol:'circle'} },
+  { x:randomHits(39,0,60), y:Array(39).fill(4), mode:'markers', name:'Player 4',
+    marker:{color:'#ef4444',size:9,symbol:'circle'} },
+], {
+  ...LAYOUT_BASE,
+  yaxis: { tickvals:[1,2,3,4], ticktext:['Player 1','Player 2','Player 3','Player 4'], gridcolor:'#2d3139' },
+  xaxis: { title:'Time (s)', gridcolor:'#2d3139' },
+  legend: { orientation:'h', y:1.1 },
+  height: 220,
+});
+</script>
+</body>
+</html>
