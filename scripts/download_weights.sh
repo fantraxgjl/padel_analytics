@@ -58,21 +58,18 @@ done
 
 if ! $success; then
     echo "ERROR: Failed to download weights after $max_attempts attempts." >&2
-    echo "Residential IPs are often rate-limited by Google Drive." >&2
     echo "Manual fix: download the folder in your browser and mount it:" >&2
     echo "  https://drive.google.com/drive/folders/${FOLDER_ID}" >&2
     echo "  docker run -v /path/to/weights:/app/weights ..." >&2
     exit 1
 fi
 
-# gdown creates a subfolder named after the Drive folder.
-# If files landed somewhere other than weights/, move them into place.
-for subdir in */; do
-    [[ "$subdir" == "weights/" ]] && continue
-    if find "$subdir" -name "*.pt" -quit 2>/dev/null; then
-        echo "Found .pt files in $subdir — moving into weights/"
-        cp -rn "${subdir}"*/ weights/ 2>/dev/null || true
-        rm -rf "$subdir"
+# gdown downloads the Drive folder's subfolders directly into the current directory.
+# Move the known weight subfolders into weights/ if they landed at the root level.
+for folder in ball_detection players_detection players_keypoints_detection court_keypoints_detection; do
+    if [ -d "$folder" ]; then
+        echo "Moving $folder/ into weights/"
+        mv "$folder" "weights/$folder"
     fi
 done
 
