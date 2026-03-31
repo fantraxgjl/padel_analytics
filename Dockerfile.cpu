@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# CPU-only PyTorch — available for both amd64 and arm64
+# CPU-only PyTorch wheels — available for both linux/amd64 and linux/arm64
 RUN pip install --no-cache-dir \
     torch==2.3.0 \
     torchvision==0.18.0 \
