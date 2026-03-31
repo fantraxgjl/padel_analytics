@@ -1,5 +1,5 @@
 # CPU-only image — works natively on linux/amd64 and linux/arm64 (Apple Silicon Mac)
-# Use this tag: fantraxgjl/padel-analytics:cpu
+# Use this tag: gjlavery/padel-analytics:cpu
 FROM python:3.10-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
