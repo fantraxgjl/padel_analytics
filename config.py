@@ -87,3 +87,6 @@ KEYPOINTS_TRACKER_SAVE_PATH = os.getenv("KEYPOINTS_TRACKER_SAVE_PATH", None)
 
 # Results storage directory (for video history)
 RESULTS_DIR = os.getenv("RESULTS_DIR", "./cache/results")
+
+# Anthropic API key (for AI rally analysis)
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
