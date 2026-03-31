@@ -409,3 +409,105 @@ def partner_synchrony(
         "rolling_vertical_sync": rolling_v.tolist(),
         "rolling_horizontal_sync": rolling_h.tolist(),
     }
+
+
+# ── Coaching KPI functions ────────────────────────────────────────────────────
+
+
+def net_approach_count(df: pd.DataFrame, player_id: int) -> int:
+    """
+    Count how many times a player entered the net zone (|y| < 2 m).
+    A new approach is counted each time the player crosses into the net zone
+    after being outside it.
+    """
+    y = pd.to_numeric(df[f"player{player_id}_y"], errors="coerce")
+    in_net = (y.abs() < 2)
+    # Count transitions from outside → inside net zone
+    return int((in_net & ~in_net.shift(1, fill_value=False)).sum())
+
+
+def time_in_nomansland_pct(df: pd.DataFrame, player_id: int) -> float:
+    """
+    Percentage of frames where player is in the transition zone (3 <= |y| < 6 m).
+    High values indicate poor positioning discipline.
+    """
+    y = pd.to_numeric(df[f"player{player_id}_y"], errors="coerce").dropna()
+    if len(y) == 0:
+        return 0.0
+    abs_y = y.abs()
+    return round(100 * float(((abs_y >= 3) & (abs_y < 6)).sum()) / len(y), 1)
+
+
+def change_of_direction_count(
+    df: pd.DataFrame, player_id: int, threshold: float = 0.3
+) -> int:
+    """
+    Count lateral direction reversals above a speed threshold (m/s).
+    High count = explosive, active lateral movement.
+    Low count = mostly linear or passive movement.
+    """
+    vx = pd.to_numeric(df[f"player{player_id}_Vx1"], errors="coerce")
+    moving = vx.abs() > threshold
+    sign = np.sign(vx)
+    reversals = (sign != sign.shift(1)) & moving & moving.shift(1, fill_value=False)
+    return int(reversals.sum())
+
+
+def lateral_bias(df: pd.DataFrame, player_id: int) -> float:
+    """
+    Mean lateral velocity (Vx) as a bias indicator.
+    Positive = predominantly moving right; negative = predominantly moving left.
+    Near zero = balanced lateral coverage.
+    """
+    vx = pd.to_numeric(df[f"player{player_id}_Vx1"], errors="coerce")
+    result = vx.mean()
+    return round(float(result), 3) if not np.isnan(result) else 0.0
+
+
+def recovery_speed(df: pd.DataFrame, player_id: int) -> float:
+    """
+    Mean speed (m/s) in frames immediately after the player exits the net zone
+    (first 30 frames after leaving |y| < 2). Proxy for how quickly they recover
+    to a defensive position after attacking the net.
+    """
+    y = pd.to_numeric(df[f"player{player_id}_y"], errors="coerce")
+    vnorm = pd.to_numeric(df[f"player{player_id}_Vnorm1"], errors="coerce")
+    in_net = y.abs() < 2
+    exit_net = (~in_net) & in_net.shift(1, fill_value=False)
+
+    speeds = []
+    exit_indices = df.index[exit_net].tolist()
+    for idx in exit_indices:
+        loc = df.index.get_loc(idx)
+        window_end = min(loc + 30, len(df))
+        speeds.extend(vnorm.iloc[loc:window_end].dropna().tolist())
+
+    if not speeds:
+        return 0.0
+    return round(float(np.mean(speeds)), 3)
+
+
+def peak_sprint_count(
+    df: pd.DataFrame, player_id: int, threshold: float = 5.5
+) -> int:
+    """
+    Count the number of frames where player speed exceeds threshold (m/s).
+    Proxy for explosive sprint frequency / physical conditioning.
+    Default threshold 5.5 m/s ≈ 20 km/h (sprinting category).
+    """
+    vnorm = pd.to_numeric(df[f"player{player_id}_Vnorm1"], errors="coerce")
+    return int((vnorm > threshold).sum())
+
+
+def coaching_kpis(df: pd.DataFrame, player_id: int) -> dict:
+    """
+    Compute all coaching KPIs for a single player. Returns a flat dict.
+    """
+    return {
+        "net_approach_count": net_approach_count(df, player_id),
+        "time_in_nomansland_pct": time_in_nomansland_pct(df, player_id),
+        "change_of_direction_count": change_of_direction_count(df, player_id),
+        "lateral_bias": lateral_bias(df, player_id),
+        "recovery_speed": recovery_speed(df, player_id),
+        "peak_sprint_count": peak_sprint_count(df, player_id),
+    }

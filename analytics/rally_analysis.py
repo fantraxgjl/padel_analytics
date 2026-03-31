@@ -133,14 +133,16 @@ def analyse_rallies_with_claude(
     rallies: list[dict],
     zone_data: dict,
     sync_data: dict,
+    kpi_data: Optional[dict] = None,
     player_names: Optional[dict] = None,
 ) -> dict:
     """
     Send match data to Claude (claude-sonnet-4-6) for coaching analysis.
 
     Returns a dict with:
-        player_feedback: {str(player_id): str}
-        overall_patterns: list[str]
+        player_feedback:     {str(player_id): str}
+        training_drills:     {str(player_id): list[str]}  (3 drills per player)
+        overall_patterns:    list[str]
 
     Requires ANTHROPIC_API_KEY environment variable.
     """
@@ -150,6 +152,7 @@ def analyse_rallies_with_claude(
         return {
             "error": "anthropic package not installed — add it to requirements.txt",
             "player_feedback": {},
+            "training_drills": {},
             "overall_patterns": [],
         }
 
@@ -158,33 +161,49 @@ def analyse_rallies_with_claude(
         return {
             "error": "ANTHROPIC_API_KEY environment variable not set",
             "player_feedback": {},
+            "training_drills": {},
             "overall_patterns": [],
         }
 
     if player_names is None:
         player_names = {1: "Player 1", 2: "Player 2", 3: "Player 3", 4: "Player 4"}
 
+    kpi_section = ""
+    if kpi_data:
+        kpi_section = (
+            f"\nPer-player coaching KPIs:\n{json.dumps(kpi_data, indent=2)}\n\n"
+            "KPI reference:\n"
+            "- net_approach_count: how many times player crossed into net zone (|y|<2m)\n"
+            "- time_in_nomansland_pct: % of time in transition zone (3-6m) — high = poor positioning\n"
+            "- change_of_direction_count: lateral direction reversals — low = passive/linear movement\n"
+            "- lateral_bias: mean Vx (positive=right, negative=left) — near zero = balanced coverage\n"
+            "- recovery_speed: avg speed (m/s) when retreating from net — low = slow recovery\n"
+            "- peak_sprint_count: frames above 5.5 m/s — physical conditioning indicator\n"
+        )
+
     client = anthropic.Anthropic(api_key=api_key)
 
     prompt = (
-        "You are an expert padel coach analysing match tracking data.\n"
-        "Based on the data below, provide:\n"
-        "1. Short, actionable coaching feedback for each player (2-3 sentences).\n"
-        "2. 3-5 overall tactical patterns or observations.\n\n"
-        f"Total rallies detected: {len(rallies)}\n\n"
+        "You are an expert padel coach analysing intermediate-level match tracking data.\n"
+        "Based on the data below, provide for each player:\n"
+        "1. Short, actionable coaching feedback (2-3 sentences).\n"
+        "2. Exactly 3 specific training drill recommendations based on their weaknesses.\n"
+        "   Each drill should be a concrete exercise name + 1-sentence description.\n"
+        "Also provide 3-5 overall tactical patterns observed across the match.\n\n"
+        f"Total rallies detected: {len(rallies)}\n"
         f"Court zone breakdown (% time in front/transition/back per player):\n"
         f"{json.dumps(zone_data, indent=2)}\n\n"
-        f"Partner synchrony scores (Pearson r, range -1 to +1):\n"
-        f"{json.dumps(sync_data, indent=2)}\n\n"
+        f"Partner synchrony scores (Pearson r, -1 to +1):\n"
+        f"{json.dumps(sync_data, indent=2)}\n"
+        f"{kpi_section}"
         f"Rally summaries (first 20 rallies):\n"
         f"{json.dumps(rallies[:20], indent=2)}\n\n"
         "Respond with valid JSON only — no markdown, no prose outside the JSON:\n"
         "{\n"
-        '  "player_feedback": {\n'
-        '    "1": "...",\n'
-        '    "2": "...",\n'
-        '    "3": "...",\n'
-        '    "4": "..."\n'
+        '  "player_feedback": {"1": "...", "2": "...", "3": "...", "4": "..."},\n'
+        '  "training_drills": {\n'
+        '    "1": ["Drill name: description", "Drill name: description", "Drill name: description"],\n'
+        '    "2": [...], "3": [...], "4": [...]\n'
         "  },\n"
         '  "overall_patterns": ["...", "...", "..."]\n'
         "}"
@@ -192,7 +211,7 @@ def analyse_rallies_with_claude(
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1024,
+        max_tokens=1500,
         messages=[{"role": "user", "content": prompt}],
     )
 

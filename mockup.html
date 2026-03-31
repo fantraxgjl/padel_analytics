@@ -3,292 +3,423 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Padel Analytics — Dashboard Mockup</title>
+<title>Padel Analytics — Dashboard Mockup v2</title>
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0e1117; color: #fafafa; }
-  .app { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
-  h1 { font-size: 2rem; font-weight: 700; margin-bottom: 24px; }
-  h2 { font-size: 1.4rem; font-weight: 600; margin: 36px 0 12px; border-top: 1px solid #2d3139; padding-top: 20px; }
-  h3 { font-size: 1.05rem; font-weight: 600; margin: 20px 0 10px; }
-  p.caption { font-size: 0.82rem; color: #a0a0b0; margin-bottom: 12px; }
-  .cols4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
-  .cols2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 16px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0e1117; color: #fafafa; display: flex; }
+
+  /* Sidebar */
+  .sidebar { width: 220px; min-height: 100vh; background: #161a23; border-right: 1px solid #2d3139; padding: 20px 14px; flex-shrink: 0; }
+  .sidebar h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-bottom: 14px; }
+  .sidebar select { width: 100%; background: #1c1f27; border: 1px solid #2d3139; border-radius: 6px; color: #fff; padding: 7px 10px; font-size: 0.86rem; margin-bottom: 14px; }
+  .sidebar label { font-size: 0.78rem; color: #9094a0; display: block; margin-bottom: 3px; }
+  .sidebar input { width: 100%; background: #1c1f27; border: 1px solid #2d3139; border-radius: 5px; color: #fff; padding: 5px 8px; font-size: 0.82rem; margin-bottom: 8px; }
+  .sidebar button { width: 100%; background: #6366f1; color: #fff; border: none; border-radius: 6px; padding: 7px; font-size: 0.82rem; cursor: pointer; margin-top: 4px; }
+
+  /* Main */
+  .main { flex: 1; padding: 24px 28px; overflow-x: hidden; }
+  h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 20px; }
+
+  /* Expanders */
+  .expander { background: #1c1f27; border: 1px solid #2d3139; border-radius: 8px; margin-bottom: 10px; }
+  .expander-header { padding: 10px 14px; font-size: 0.88rem; color: #9094a0; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .expander-header::before { content: "▸"; font-size: 0.7rem; }
+
+  /* Tabs */
+  .tabs { display: flex; border-bottom: 1px solid #2d3139; margin-bottom: 20px; gap: 0; overflow-x: auto; }
+  .tab { padding: 10px 16px; font-size: 0.86rem; color: #9094a0; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab:hover { color: #d0d0e0; }
+  .tab.active { color: #fff; border-bottom-color: #6366f1; font-weight: 600; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Cards */
+  .cols4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .cols3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .cols2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px; }
   .metric-card { background: #1c1f27; border: 1px solid #2d3139; border-radius: 8px; padding: 14px 16px; }
-  .metric-label { font-size: 0.78rem; color: #9094a0; margin-bottom: 4px; }
-  .metric-value { font-size: 1.6rem; font-weight: 700; color: #fff; }
-  .metric-sub { font-size: 0.78rem; color: #9094a0; margin-top: 2px; }
-  .chart-box { background: #1c1f27; border: 1px solid #2d3139; border-radius: 8px; padding: 8px; margin-bottom: 16px; }
-  .chart-box-wide { margin-bottom: 20px; }
-  .info-banner { background: #1a2744; border: 1px solid #2a4080; border-radius: 8px; padding: 12px 16px; color: #80a8f0; font-size: 0.88rem; margin: 12px 0 20px; }
-  .ai-card { background: #1c1f27; border: 1px solid #2d3139; border-radius: 8px; padding: 16px; }
-  .ai-card h4 { font-size: 0.92rem; font-weight: 700; margin-bottom: 8px; color: #c084fc; }
-  .ai-card p { font-size: 0.88rem; line-height: 1.55; color: #d0d0e0; }
-  .pattern-item { font-size: 0.88rem; color: #d0d0e0; line-height: 1.6; padding: 4px 0; }
-  .pattern-item::before { content: "• "; color: #6366f1; font-weight: 700; }
-  .section-label { display: inline-block; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #9094a0; border: 1px solid #2d3139; border-radius: 4px; padding: 2px 7px; margin-bottom: 14px; }
-  .sync-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
-  .badge { display: inline-block; font-size: 0.7rem; font-weight: 700; border-radius: 4px; padding: 2px 7px; margin-right: 4px; }
+  .metric-label { font-size: 0.75rem; color: #9094a0; margin-bottom: 4px; }
+  .metric-value { font-size: 1.55rem; font-weight: 700; color: #fff; }
+  .metric-badge { display: inline-block; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-top: 4px; font-weight: 600; }
   .badge-green { background: #14532d; color: #4ade80; }
   .badge-amber { background: #431407; color: #fb923c; }
-  .badge-blue  { background: #1e3a5f; color: #60a5fa; }
-  .stacked-label { font-size: 0.78rem; color: #9094a0; margin-bottom: 4px; }
-  .tabs { display: flex; gap: 0; border-bottom: 1px solid #2d3139; margin-bottom: 16px; }
-  .tab { padding: 8px 18px; font-size: 0.88rem; color: #9094a0; cursor: pointer; border-bottom: 2px solid transparent; }
-  .tab.active { color: #fff; border-bottom-color: #6366f1; }
+  .badge-red   { background: #450a0a; color: #f87171; }
+
+  h2 { font-size: 1.2rem; font-weight: 600; margin: 20px 0 12px; }
+  h3 { font-size: 0.95rem; font-weight: 600; margin: 16px 0 8px; }
+  p.caption { font-size: 0.78rem; color: #6b7280; margin-bottom: 10px; }
+
+  .chart-box { background: #1c1f27; border: 1px solid #2d3139; border-radius: 8px; padding: 8px; margin-bottom: 14px; }
+
+  /* AI Cards */
+  .ai-feedback { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+  .ai-feedback .label { font-size: 0.75rem; color: #94a3b8; margin-bottom: 6px; }
+  .ai-feedback p { font-size: 0.9rem; line-height: 1.6; color: #e2e8f0; }
+  .drill-card { background: #172033; border-left: 3px solid #6366f1; padding: 10px 14px; margin: 8px 0; border-radius: 0 6px 6px 0; }
+  .drill-card b { color: #a5b4fc; font-size: 0.88rem; }
+  .drill-card p { color: #cbd5e1; font-size: 0.82rem; margin: 3px 0 0; }
+
+  /* Zone bar */
+  .zone-bar { display: flex; height: 28px; border-radius: 6px; overflow: hidden; width: 100%; margin-bottom: 6px; }
+  .zone-seg { display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.85); }
+  .zone-legend { display: flex; gap: 14px; margin-top: 6px; }
+  .zone-legend span { font-size: 0.72rem; color: #9094a0; display: flex; align-items: center; gap: 5px; }
+  .zone-dot { width: 9px; height: 9px; border-radius: 2px; }
 </style>
 </head>
 <body>
-<div class="app">
 
+<!-- ── Sidebar ── -->
+<div class="sidebar">
+  <h3>My Profile</h3>
+  <label>I am:</label>
+  <select>
+    <option>Player 1 — Alice</option>
+    <option>Player 2 — Bob</option>
+    <option>Player 3 — Carlos</option>
+    <option>Player 4 — Diana</option>
+  </select>
+  <label>Player 1</label><input value="Alice">
+  <label>Player 2</label><input value="Bob">
+  <label>Player 3</label><input value="Carlos">
+  <label>Player 4</label><input value="Diana">
+  <button>Save names</button>
+</div>
+
+<!-- ── Main ── -->
+<div class="main">
   <h1>Padel Analytics</h1>
 
-  <!-- ── Match Summary ── -->
-  <h2>Match Summary</h2>
-  <div class="cols4">
-    <div class="metric-card"><div class="metric-label">Player 1</div><div class="metric-value">1 247 m</div><div class="metric-sub">Total distance</div></div>
-    <div class="metric-card"><div class="metric-label">Player 2</div><div class="metric-value">1 183 m</div><div class="metric-sub">Total distance</div></div>
-    <div class="metric-card"><div class="metric-label">Player 3</div><div class="metric-value">1 312 m</div><div class="metric-sub">Total distance</div></div>
-    <div class="metric-card"><div class="metric-label">Player 4</div><div class="metric-value">1 091 m</div><div class="metric-sub">Total distance</div></div>
-  </div>
-  <div class="cols4">
-    <div class="metric-card"><div class="metric-label">Max speed</div><div class="metric-value">24.3 km/h</div></div>
-    <div class="metric-card"><div class="metric-label">Max speed</div><div class="metric-value">21.8 km/h</div></div>
-    <div class="metric-card"><div class="metric-label">Max speed</div><div class="metric-value">26.1 km/h</div></div>
-    <div class="metric-card"><div class="metric-label">Max speed</div><div class="metric-value">19.4 km/h</div></div>
-  </div>
+  <div class="expander"><div class="expander-header">Match Details — 2024-03-15 · Won 6-3 6-2 · Club de Pádel Madrid</div></div>
+  <div class="expander"><div class="expander-header">Import from match tracker</div></div>
+  <div class="expander"><div class="expander-header">Video &amp; Export</div></div>
 
-  <!-- ── Court Zone Breakdown ── -->
-  <h2>Court Zone Breakdown</h2>
-  <p class="caption">Front: |y| &lt; 3 m (net zone)  ·  Transition: 3–6 m  ·  Back: |y| &gt; 6 m</p>
-  <div class="chart-box chart-box-wide"><div id="zone-bar"></div></div>
-
-  <h3>Position heatmap with zone boundaries</h3>
-  <div class="cols4">
-    <div class="chart-box"><div id="heat1" style="height:320px"></div></div>
-    <div class="chart-box"><div id="heat2" style="height:320px"></div></div>
-    <div class="chart-box"><div id="heat3" style="height:320px"></div></div>
-    <div class="chart-box"><div id="heat4" style="height:320px"></div></div>
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab(0)">My Summary</div>
+    <div class="tab" onclick="switchTab(1)">My Positioning</div>
+    <div class="tab" onclick="switchTab(2)">My Movement</div>
+    <div class="tab" onclick="switchTab(3)">My Shots</div>
+    <div class="tab" onclick="switchTab(4)">My Partner</div>
+    <div class="tab" onclick="switchTab(5)">AI Coaching</div>
+    <div class="tab" onclick="switchTab(6)">Match Overview</div>
   </div>
 
-  <!-- ── Partner Synchrony ── -->
-  <h2>Partner Synchrony</h2>
-  <p class="caption">Rolling Pearson correlation (60-frame window) between partners' velocity components. +1 = perfectly in sync, −1 = perfectly mirrored.</p>
-
-  <h3>Team A (Players 1 &amp; 2)</h3>
-  <div class="sync-row">
-    <div class="metric-card"><div class="metric-label">Vertical sync (Vy)</div><div class="metric-value">+0.71</div><div class="metric-sub">Forward/backward</div></div>
-    <div class="metric-card"><div class="metric-label">Horizontal sync (Vx)</div><div class="metric-value">+0.58</div><div class="metric-sub">Side-to-side</div></div>
-    <div class="metric-card"><div class="metric-label">Avg formation width</div><div class="metric-value">2.4 m</div><div class="metric-sub">Median lateral gap</div></div>
-  </div>
-  <div class="chart-box"><div id="sync-a"></div></div>
-
-  <h3>Team B (Players 3 &amp; 4)</h3>
-  <div class="sync-row">
-    <div class="metric-card"><div class="metric-label">Vertical sync (Vy)</div><div class="metric-value">+0.48</div><div class="metric-sub">Forward/backward</div></div>
-    <div class="metric-card"><div class="metric-label">Horizontal sync (Vx)</div><div class="metric-value">+0.33</div><div class="metric-sub">Side-to-side</div></div>
-    <div class="metric-card"><div class="metric-label">Avg formation width</div><div class="metric-value">3.1 m</div><div class="metric-sub">Median lateral gap</div></div>
-  </div>
-  <div class="chart-box"><div id="sync-b"></div></div>
-
-  <!-- ── Hit Counting & Shot Types ── -->
-  <h2>Hit Counting &amp; Shot Types</h2>
-
-  <h3>Hits per player</h3>
-  <div class="cols4">
-    <div class="metric-card"><div class="metric-label">Player 1</div><div class="metric-value">47</div><div class="metric-sub">Detected hit events</div></div>
-    <div class="metric-card"><div class="metric-label">Player 2</div><div class="metric-value">52</div><div class="metric-sub">Detected hit events</div></div>
-    <div class="metric-card"><div class="metric-label">Player 3</div><div class="metric-value">44</div><div class="metric-sub">Detected hit events</div></div>
-    <div class="metric-card"><div class="metric-label">Player 4</div><div class="metric-value">39</div><div class="metric-sub">Detected hit events</div></div>
-  </div>
-
-  <h3>Shot type distribution</h3>
-  <div class="chart-box chart-box-wide"><div id="shots-bar"></div></div>
-
-  <h3>Hit timeline</h3>
-  <div class="chart-box"><div id="hit-timeline"></div></div>
-
-  <!-- ── AI Rally Analysis ── -->
-  <h2>AI Rally Analysis</h2>
-  <p class="caption">Loaded from cache · 34 rallies detected</p>
-
-  <h3>Per-player coaching feedback</h3>
-  <div class="cols2">
-    <div class="ai-card">
-      <h4>Player 1</h4>
-      <p>Strong net presence — spends 61% of time in the front zone, the highest of all four players. Focus on reducing unforced errors on the bandeja by holding the elbow higher at contact. Your formation width with Player 2 is good at 2.4 m; maintain this when defending lobs.</p>
+  <!-- ══ TAB: MY SUMMARY ══ -->
+  <div class="tab-content active" id="tab0">
+    <h2>Alice's Match Summary</h2>
+    <div class="cols4">
+      <div class="metric-card"><div class="metric-label">Distance covered</div><div class="metric-value">1 247 m</div></div>
+      <div class="metric-card"><div class="metric-label">Max speed</div><div class="metric-value">24.3 km/h</div></div>
+      <div class="metric-card"><div class="metric-label">Avg speed</div><div class="metric-value">6.1 km/h</div></div>
+      <div class="metric-card"><div class="metric-label">Net approaches</div><div class="metric-value">23</div></div>
     </div>
-    <div class="ai-card">
-      <h4>Player 2</h4>
-      <p>Excellent vertical sync with Player 1 (r = 0.71) shows strong tactical movement coordination. You are hitting more viboras than any other player — consider mixing in more bandejas on slower lobs to keep opponents guessing. Increase back-court time slightly to defend deep lobs.</p>
+
+    <h3>Court zones</h3>
+    <div class="zone-bar">
+      <div class="zone-seg" style="width:61%;background:#22c55e">61% Front</div>
+      <div class="zone-seg" style="width:24%;background:#f59e0b">24%</div>
+      <div class="zone-seg" style="width:15%;background:#ef4444">15%</div>
     </div>
-    <div class="ai-card">
-      <h4>Player 3</h4>
-      <p>Covers the most distance at 1 312 m — indicating a reactive rather than proactive positioning style. Work on anticipating lob trajectories earlier to reduce the number of defensive globos (currently 38% of shots). Synchrony with Player 4 can be improved, particularly horizontal movement.</p>
+    <div class="zone-legend">
+      <span><div class="zone-dot" style="background:#22c55e"></div>Front (net zone)</span>
+      <span><div class="zone-dot" style="background:#f59e0b"></div>Transition</span>
+      <span><div class="zone-dot" style="background:#ef4444"></div>Back court</span>
     </div>
-    <div class="ai-card">
-      <h4>Player 4</h4>
-      <p>Lowest hit count (39) suggests a passive role; look to take more initiative at the net. Max speed of 19.4 km/h is the lowest — focus on explosive first-step reactions. The team's formation width of 3.1 m is wider than ideal; closing toward 2.5 m would reduce the central corridor gap.</p>
+
+    <div class="cols3" style="margin-top:16px">
+      <div class="metric-card"><div class="metric-label">Time in no-man's land</div><div class="metric-value">24.0%</div><div class="metric-badge badge-amber">Monitor</div></div>
+      <div class="metric-card"><div class="metric-label">Direction changes</div><div class="metric-value">84</div><div class="metric-badge badge-green">Active</div></div>
+      <div class="metric-card"><div class="metric-label">Sprint bursts (&gt;20 km/h)</div><div class="metric-value">12</div></div>
     </div>
   </div>
 
-  <h3>Overall tactical patterns</h3>
-  <div style="background:#1c1f27;border:1px solid #2d3139;border-radius:8px;padding:16px;margin-top:8px">
-    <div class="pattern-item">Team A dominates the net zone for 58% of play while Team B is predominantly back-court (64%), creating a consistent asymmetry exploited by Team A through smashes and volleys.</div>
-    <div class="pattern-item">Rally lengths are short (median 4.2 s, 3 hits), suggesting high-pace point construction with few extended baseline exchanges.</div>
-    <div class="pattern-item">Player 3 is the primary target of lobs from Team A — 71% of globos are directed to the Player 3 side, indicating Team A has identified a positional weakness.</div>
-    <div class="pattern-item">Team B's below-average horizontal sync (r = 0.33) leaves a central corridor gap that Team A exploits with chiquitas in 12 of 34 rallies.</div>
-    <div class="pattern-item">Both teams show higher synchrony in the first half of the match; sync scores drop noticeably after the 4-minute mark, consistent with fatigue or tactical disruption.</div>
+  <!-- ══ TAB: MY POSITIONING ══ -->
+  <div class="tab-content" id="tab1">
+    <h2>Alice's Court Positioning</h2>
+    <div style="display:flex;gap:20px;align-items:flex-start">
+      <div class="chart-box" style="flex:0 0 auto"><div id="heatmap" style="width:380px;height:760px"></div></div>
+      <div style="flex:1">
+        <h3>Zone breakdown</h3>
+        <div style="margin:10px 0">
+          <div style="display:flex;align-items:center;gap:10px;margin:10px 0">
+            <div style="width:14px;height:14px;border-radius:3px;background:#22c55e"></div>
+            <div><b>61.0%</b> Front<br><span style="font-size:0.75rem;color:#888">Net zone — attacking position</span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin:10px 0">
+            <div style="width:14px;height:14px;border-radius:3px;background:#f59e0b"></div>
+            <div><b>24.0%</b> Transition<br><span style="font-size:0.75rem;color:#888">No-man's land — minimise time here</span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin:10px 0">
+            <div style="width:14px;height:14px;border-radius:3px;background:#ef4444"></div>
+            <div><b>15.0%</b> Back<br><span style="font-size:0.75rem;color:#888">Defensive position</span></div>
+          </div>
+        </div>
+        <div class="metric-card" style="margin-bottom:10px"><div class="metric-label">Net approaches</div><div class="metric-value">23</div></div>
+        <div class="metric-card"><div class="metric-label">Lateral bias</div><div class="metric-value" style="font-size:1rem;padding:4px 0">→ Slightly right-biased</div></div>
+      </div>
+    </div>
   </div>
 
+  <!-- ══ TAB: MY MOVEMENT ══ -->
+  <div class="tab-content" id="tab2">
+    <h2>Alice's Movement Profile</h2>
+    <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+      <div class="chart-box" style="flex:0 0 320px"><div id="speed-donut" style="height:300px"></div></div>
+      <div style="flex:1;min-width:200px">
+        <div class="metric-card" style="margin-bottom:10px"><div class="metric-label">Distance covered</div><div class="metric-value">1 247 m</div></div>
+        <div class="metric-card" style="margin-bottom:10px"><div class="metric-label">Sprint bursts</div><div class="metric-value">12</div></div>
+        <div class="metric-card"><div class="metric-label">Direction changes</div><div class="metric-value">84</div></div>
+      </div>
+    </div>
+    <h3>Speed over time</h3>
+    <div class="chart-box"><div id="speed-line" style="height:180px"></div></div>
+  </div>
+
+  <!-- ══ TAB: MY SHOTS ══ -->
+  <div class="tab-content" id="tab3">
+    <h2>Alice's Shots</h2>
+    <div class="metric-card" style="display:inline-block;margin-bottom:16px"><div class="metric-label">Total hits</div><div class="metric-value">47</div></div>
+    <h3>Shot breakdown</h3>
+    <div class="chart-box"><div id="shots-bar" style="height:280px"></div></div>
+    <h3>Where I hit from</h3>
+    <div class="chart-box" style="display:inline-block"><div id="hit-court" style="width:340px;height:680px"></div></div>
+  </div>
+
+  <!-- ══ TAB: MY PARTNER ══ -->
+  <div class="tab-content" id="tab4">
+    <h2>Alice &amp; Bob</h2>
+    <div class="cols3">
+      <div class="metric-card">
+        <div class="metric-label">Forward/back sync</div>
+        <div class="metric-value">+0.71</div>
+        <div class="metric-badge badge-green">🟢 Good</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Side-to-side sync</div>
+        <div class="metric-value">+0.58</div>
+        <div class="metric-badge badge-amber">🟡 Developing</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Avg formation width</div>
+        <div class="metric-value">2.4 m</div>
+      </div>
+    </div>
+    <p class="caption">Pearson r (rolling 60-frame window). +1 = perfectly in step, −1 = perfectly mirrored.</p>
+    <details style="margin-top:12px">
+      <summary style="cursor:pointer;font-size:0.84rem;color:#6366f1;padding:6px 0">Show rolling sync over time</summary>
+      <div class="chart-box" style="margin-top:8px"><div id="sync-chart" style="height:200px"></div></div>
+    </details>
+  </div>
+
+  <!-- ══ TAB: AI COACHING ══ -->
+  <div class="tab-content" id="tab5">
+    <h2>AI Coaching — Alice</h2>
+    <div class="ai-feedback">
+      <div class="label">Coaching feedback</div>
+      <p>Strong net presence — you spend 61% of time in the front zone, the highest of all four players. Your bandeja volume is good but consider mixing in more viboras to keep opponents guessing. Side-to-side sync with Bob (0.58) has room to grow; work on mirroring his lateral movements more actively.</p>
+    </div>
+
+    <h3>Recommended training drills</h3>
+    <div class="drill-card">
+      <b>Lateral Mirror Drill</b>
+      <p>Stand side by side with your partner at the net; move laterally in unison without the ball for 3 sets of 60 seconds, focusing on matching each other's step timing.</p>
+    </div>
+    <div class="drill-card">
+      <b>Bandeja / Vibora Decision Series</b>
+      <p>Coach feeds alternating medium and high lobs; call the shot type out loud before contact to sharpen decision-making between backspin bandeja and sidespin vibora.</p>
+    </div>
+    <div class="drill-card">
+      <b>Transition Zone Exit Drill</b>
+      <p>Two cones at 3 m and 6 m from the net; every time you are forced into the transition zone, sprint to regain the net position within 2 seconds of a feed ball.</p>
+    </div>
+
+    <details style="margin-top:14px">
+      <summary style="cursor:pointer;font-size:0.84rem;color:#6366f1;padding:6px 0">Overall match patterns</summary>
+      <ul style="margin-top:8px;padding-left:18px;line-height:1.8;font-size:0.86rem;color:#d0d0e0">
+        <li>Team A dominates the net zone 58% of play vs. Team B's 20%.</li>
+        <li>Rally length is short (median 4.2 s, 3 hits) — point construction is fast-paced.</li>
+        <li>Player 3 (Carlos) is the primary lob target — 71% of globos go to his side.</li>
+        <li>Team B's horizontal sync gap leaves a central corridor exploited with chiquitas.</li>
+        <li>Sync scores drop after 4 minutes, consistent with tactical fatigue.</li>
+      </ul>
+    </details>
+
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;font-size:0.84rem;color:#6b7280;padding:6px 0">Other players' feedback</summary>
+      <div style="margin-top:10px;font-size:0.84rem;color:#d0d0e0;line-height:1.6">
+        <p><b>Bob:</b> Excellent vertical sync with Alice — you are the team's positional anchor. Increase vibora frequency.</p>
+        <p style="margin-top:8px"><b>Carlos:</b> Covers most distance at 1 312 m; focus on earlier lob reading to reduce reactive globos.</p>
+        <p style="margin-top:8px"><b>Diana:</b> Lowest hit count (39) — look to take more initiative at net. Improve recovery speed after net attacks.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- ══ TAB: MATCH OVERVIEW ══ -->
+  <div class="tab-content" id="tab6">
+    <h2>Match Overview — All Players</h2>
+    <div class="cols4">
+      <div class="metric-card"><div class="metric-label">Alice (P1)</div><div class="metric-value">1 247 m</div><div class="metric-badge badge-green">Max 24.3 km/h</div></div>
+      <div class="metric-card"><div class="metric-label">Bob (P2)</div><div class="metric-value">1 183 m</div><div class="metric-badge badge-green">Max 21.8 km/h</div></div>
+      <div class="metric-card"><div class="metric-label">Carlos (P3)</div><div class="metric-value">1 312 m</div><div class="metric-badge badge-amber">Max 26.1 km/h</div></div>
+      <div class="metric-card"><div class="metric-label">Diana (P4)</div><div class="metric-value">1 091 m</div><div class="metric-badge badge-red">Max 19.4 km/h</div></div>
+    </div>
+    <h3>Court zone breakdown</h3>
+    <div class="chart-box"><div id="overview-zones" style="height:280px"></div></div>
+    <h3>Position heatmaps</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <div class="chart-box"><div id="ov-h1" style="width:220px;height:440px"></div></div>
+      <div class="chart-box"><div id="ov-h2" style="width:220px;height:440px"></div></div>
+      <div class="chart-box"><div id="ov-h3" style="width:220px;height:440px"></div></div>
+      <div class="chart-box"><div id="ov-h4" style="width:220px;height:440px"></div></div>
+    </div>
+  </div>
 </div>
 
 <script>
-const LAYOUT_BASE = {
-  paper_bgcolor: '#1c1f27',
-  plot_bgcolor: '#1c1f27',
-  font: { color: '#d0d0e0', size: 11 },
-  margin: { l: 50, r: 20, t: 28, b: 40 },
-};
-
-// ── Zone stacked bar ──
-Plotly.newPlot('zone-bar', [
-  { name: 'Front', x: ['Player 1','Player 2','Player 3','Player 4'], y: [61, 54, 18, 22], type: 'bar', marker: { color: '#22c55e' } },
-  { name: 'Transition', x: ['Player 1','Player 2','Player 3','Player 4'], y: [24, 28, 18, 20], type: 'bar', marker: { color: '#f59e0b' } },
-  { name: 'Back', x: ['Player 1','Player 2','Player 3','Player 4'], y: [15, 18, 64, 58], type: 'bar', marker: { color: '#ef4444' } },
-], {
-  ...LAYOUT_BASE,
-  barmode: 'stack',
-  yaxis: { title: '% of time', gridcolor: '#2d3139' },
-  legend: { orientation: 'h', y: 1.12 },
-  height: 300,
-});
-
-// ── Court heatmaps with zone lines ──
-function courtTraces(xData, yData) {
-  const courtLines = [
-    { x: [-5,5], y: [-10,-10], line: { color:'#555', width:3 } },
-    { x: [-5,5], y: [-7,-7],   line: { color:'#555', width:1 } },
-    { x: [-5,5], y: [0,0],     line: { color:'#555', width:1, dash:'dash' } },
-    { x: [-5,5], y: [7,7],     line: { color:'#555', width:1 } },
-    { x: [-5,5], y: [10,10],   line: { color:'#555', width:3 } },
-    { x: [-5,-5], y: [-10,10], line: { color:'#555', width:3 } },
-    { x: [5,5],   y: [-10,10], line: { color:'#555', width:3 } },
-    { x: [0,0],   y: [-7,7],   line: { color:'#555', width:1 } },
-    // zone lines
-    { x: [-5,5], y: [-3,-3], line: { color:'rgba(34,197,94,0.7)', width:1, dash:'dot' } },
-    { x: [-5,5], y: [3,3],   line: { color:'rgba(34,197,94,0.7)', width:1, dash:'dot' } },
-    { x: [-5,5], y: [-6,-6], line: { color:'rgba(251,146,60,0.7)', width:1, dash:'dot' } },
-    { x: [-5,5], y: [6,6],   line: { color:'rgba(251,146,60,0.7)', width:1, dash:'dot' } },
-  ].map(l => ({ ...l, mode:'lines', showlegend:false, hoverinfo:'skip', type:'scatter' }));
-
-  const density = {
-    type: 'histogram2dcontour',
-    x: xData, y: yData,
-    colorscale: 'Hot', reversescale: true,
-    opacity: 0.65, showscale: false, ncontours: 12,
-  };
-  return [...courtLines, density];
+function switchTab(n) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===n));
+  document.querySelectorAll('.tab-content').forEach((c,i) => c.classList.toggle('active', i===n));
+  if (n === 1 && !window._heatDrawn) { drawHeatmap(); window._heatDrawn = true; }
+  if (n === 2 && !window._movDrawn) { drawMovement(); window._movDrawn = true; }
+  if (n === 3 && !window._shotsDrawn) { drawShots(); window._shotsDrawn = true; }
+  if (n === 4 && !window._partnerDrawn) { drawPartner(); window._partnerDrawn = true; }
+  if (n === 6 && !window._ovDrawn) { drawOverview(); window._ovDrawn = true; }
 }
 
-const courtLayout = (title) => ({
-  ...LAYOUT_BASE,
-  title: { text: title, font: { size: 11 } },
-  xaxis: { range: [-5,5], showgrid: false, zeroline: false, showticklabels: false },
-  yaxis: { range: [-10,10], showgrid: false, zeroline: false, showticklabels: false },
-  height: 320, width: 240,
-  margin: { l: 8, r: 8, t: 28, b: 8 },
-  showlegend: false,
-});
+const DARK = { paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#d0d0e0',size:11}, margin:{l:8,r:8,t:28,b:40} };
 
-// Simulated position data
+// ── Court background shapes (green + white lines) ──
+function courtShapes() {
+  const lines = [
+    {x0:-5,y0:-10,x1:5,y1:-10,w:3},{x0:-5,y0:10,x1:5,y1:10,w:3},
+    {x0:-5,y0:-10,x1:-5,y1:10,w:3},{x0:5,y0:-10,x1:5,y1:10,w:3},
+    {x0:-5,y0:-7,x1:5,y1:-7,w:1.5},{x0:-5,y0:7,x1:5,y1:7,w:1.5},
+    {x0:-5,y0:0,x1:5,y1:0,w:2.5,dash:'dot'},
+    {x0:0,y0:-7,x1:0,y1:7,w:1.5},
+    // zone lines
+    {x0:-5,y0:-3,x1:5,y1:-3,w:1,color:'rgba(255,255,255,0.35)',dash:'dot'},
+    {x0:-5,y0:3,x1:5,y1:3,w:1,color:'rgba(255,255,255,0.35)',dash:'dot'},
+    {x0:-5,y0:-6,x1:5,y1:-6,w:1,color:'rgba(255,220,100,0.35)',dash:'dot'},
+    {x0:-5,y0:6,x1:5,y1:6,w:1,color:'rgba(255,220,100,0.35)',dash:'dot'},
+  ];
+  return [
+    {type:'rect',x0:-5,y0:-10,x1:5,y1:10,fillcolor:'#3a7d44',line:{width:0},layer:'below'},
+    ...lines.map(l=>({type:'line',x0:l.x0,y0:l.y0,x1:l.x1,y1:l.y1,
+      line:{color:l.color||'white',width:l.w||1.5,dash:l.dash||'solid'},layer:'above'}))
+  ];
+}
+
+function courtLayout(w,h,title) {
+  return {...DARK,
+    title:{text:title||'',font:{size:11},x:0.5},
+    shapes:courtShapes(),
+    xaxis:{range:[-5.3,5.3],showgrid:false,zeroline:false,showticklabels:false,scaleanchor:'y'},
+    yaxis:{range:[-10.5,10.5],showgrid:false,zeroline:false,showticklabels:false},
+    width:w, height:h, showlegend:false,
+    margin:{l:8,r:8,t:title?28:8,b:8},
+  };
+}
+
+// ── Simulated position data ──
 function gauss(cx,cy,sx,sy,n){
   const xs=[],ys=[];
   for(let i=0;i<n;i++){
-    xs.push(cx + sx*(Math.random()+Math.random()+Math.random()-1.5)*0.9);
-    ys.push(cy + sy*(Math.random()+Math.random()+Math.random()-1.5)*0.9);
+    const u=()=>(Math.random()+Math.random()+Math.random()-1.5)*0.9;
+    xs.push(Math.max(-4.5,Math.min(4.5,cx+sx*u())));
+    ys.push(Math.max(-9.5,Math.min(9.5,cy+sy*u())));
   }
-  return {xs,ys};
-}
-const p1=gauss(1,5,2,2.5,300), p2=gauss(-1,5,2,2.5,300),
-      p3=gauss(1,-5,2,2.5,300), p4=gauss(-1,-5,2,2.5,300);
-
-Plotly.newPlot('heat1', courtTraces(p1.xs, p1.ys), courtLayout('Player 1'));
-Plotly.newPlot('heat2', courtTraces(p2.xs, p2.ys), courtLayout('Player 2'));
-Plotly.newPlot('heat3', courtTraces(p3.xs, p3.ys), courtLayout('Player 3'));
-Plotly.newPlot('heat4', courtTraces(p4.xs, p4.ys), courtLayout('Player 4'));
-
-// ── Synchrony rolling charts ──
-const T = Array.from({length:300}, (_,i) => i*0.2);
-function rollingSync(base, noise) {
-  return T.map((t,i) => Math.max(-1, Math.min(1,
-    base + noise*Math.sin(i*0.15) + (Math.random()-0.5)*0.18
-  )));
+  return{xs,ys};
 }
 
-Plotly.newPlot('sync-a', [
-  { x:T, y:rollingSync(0.71,0.2), mode:'lines', name:'Vertical sync (Vy)', line:{color:'#6366f1'} },
-  { x:T, y:rollingSync(0.58,0.25), mode:'lines', name:'Horizontal sync (Vx)', line:{color:'#f43f5e'} },
-  { x:[T[0],T[T.length-1]], y:[0,0], mode:'lines', line:{color:'#555',dash:'dot',width:1}, showlegend:false },
-], {
-  ...LAYOUT_BASE,
-  yaxis: { title:'Pearson r', range:[-1.1,1.1], gridcolor:'#2d3139' },
-  xaxis: { title:'Time (s)', gridcolor:'#2d3139' },
-  legend: { orientation:'h', y:1.1 },
-  height: 220,
-});
-
-Plotly.newPlot('sync-b', [
-  { x:T, y:rollingSync(0.48,0.3), mode:'lines', name:'Vertical sync (Vy)', line:{color:'#6366f1'} },
-  { x:T, y:rollingSync(0.33,0.35), mode:'lines', name:'Horizontal sync (Vx)', line:{color:'#f43f5e'} },
-  { x:[T[0],T[T.length-1]], y:[0,0], mode:'lines', line:{color:'#555',dash:'dot',width:1}, showlegend:false },
-], {
-  ...LAYOUT_BASE,
-  yaxis: { title:'Pearson r', range:[-1.1,1.1], gridcolor:'#2d3139' },
-  xaxis: { title:'Time (s)', gridcolor:'#2d3139' },
-  legend: { orientation:'h', y:1.1 },
-  height: 220,
-});
-
-// ── Shot distribution ──
-Plotly.newPlot('shots-bar', [
-  { name:'smash',    x:['P1','P2','P3','P4'], y:[8,6,3,2],   type:'bar', marker:{color:'#6366f1'} },
-  { name:'bandeja',  x:['P1','P2','P3','P4'], y:[7,9,4,3],   type:'bar', marker:{color:'#22c55e'} },
-  { name:'vibora',   x:['P1','P2','P3','P4'], y:[6,8,2,1],   type:'bar', marker:{color:'#f59e0b'} },
-  { name:'volley',   x:['P1','P2','P3','P4'], y:[9,11,3,4],  type:'bar', marker:{color:'#14b8a6'} },
-  { name:'chiquita', x:['P1','P2','P3','P4'], y:[5,4,8,6],   type:'bar', marker:{color:'#f97316'} },
-  { name:'globo',    x:['P1','P2','P3','P4'], y:[4,5,16,15], type:'bar', marker:{color:'#8b5cf6'} },
-  { name:'bajada',   x:['P1','P2','P3','P4'], y:[3,4,5,5],   type:'bar', marker:{color:'#ec4899'} },
-  { name:'unknown',  x:['P1','P2','P3','P4'], y:[5,5,3,3],   type:'bar', marker:{color:'#555'} },
-], {
-  ...LAYOUT_BASE,
-  barmode: 'stack',
-  yaxis: { title:'Hit count', gridcolor:'#2d3139' },
-  legend: { orientation:'h', y:1.12 },
-  height: 300,
-});
-
-// ── Hit timeline ──
-function randomHits(n, pStart, pEnd) {
-  return Array.from({length:n}, () => pStart + Math.random()*(pEnd-pStart));
+// ── Scatter density ──
+function kdeTrace(xs, ys) {
+  return {type:'histogram2dcontour',x:xs,y:ys,
+    colorscale:[[0,'rgba(255,255,153,0)'],[0.2,'rgba(255,237,160,0.6)'],[0.5,'rgba(254,178,76,0.8)'],[1,'rgba(189,0,38,0.92)']],
+    reversescale:false, opacity:1, showscale:false, ncontours:10,
+    contours:{coloring:'fill'}, line:{width:0}};
 }
-Plotly.newPlot('hit-timeline', [
-  { x:randomHits(47,0,60), y:Array(47).fill(1), mode:'markers', name:'Player 1',
-    marker:{color:'#6366f1',size:9,symbol:'circle'} },
-  { x:randomHits(52,0,60), y:Array(52).fill(2), mode:'markers', name:'Player 2',
-    marker:{color:'#22c55e',size:9,symbol:'circle'} },
-  { x:randomHits(44,0,60), y:Array(44).fill(3), mode:'markers', name:'Player 3',
-    marker:{color:'#f59e0b',size:9,symbol:'circle'} },
-  { x:randomHits(39,0,60), y:Array(39).fill(4), mode:'markers', name:'Player 4',
-    marker:{color:'#ef4444',size:9,symbol:'circle'} },
-], {
-  ...LAYOUT_BASE,
-  yaxis: { tickvals:[1,2,3,4], ticktext:['Player 1','Player 2','Player 3','Player 4'], gridcolor:'#2d3139' },
-  xaxis: { title:'Time (s)', gridcolor:'#2d3139' },
-  legend: { orientation:'h', y:1.1 },
-  height: 220,
-});
+
+// ── My Summary zone bar (already static HTML) ──
+
+// ── My Positioning heatmap ──
+function drawHeatmap() {
+  const p1 = gauss(1,5.5,1.8,2,400);
+  Plotly.newPlot('heatmap', [kdeTrace(p1.xs,p1.ys)], courtLayout(380,760,'Alice — position density'));
+}
+
+// ── My Movement ──
+function drawMovement() {
+  Plotly.newPlot('speed-donut',[{type:'pie',
+    labels:['Standing','Walking','Jogging','Running','Sprinting'],
+    values:[18,35,28,13,6],
+    marker:{colors:['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6']},
+    hole:0.55, textinfo:'label+percent',
+  }],{...DARK,height:300,showlegend:false,margin:{l:20,r:20,t:20,b:20}});
+
+  const T=Array.from({length:300},(_,i)=>i*0.2);
+  const spd=T.map(t=>Math.max(0,4+2.5*Math.sin(t*0.4)+3*Math.random()));
+  Plotly.newPlot('speed-line',[{x:T,y:spd,mode:'lines',fill:'tozeroy',
+    line:{color:'#6366f1',width:1},fillcolor:'rgba(99,102,241,0.15)',name:''}],
+    {...DARK,height:180,
+      yaxis:{title:'km/h',gridcolor:'#2d3139'},
+      xaxis:{title:'Time (s)',gridcolor:'#2d3139'},showlegend:false});
+}
+
+// ── My Shots ──
+function drawShots() {
+  Plotly.newPlot('shots-bar',[{
+    type:'bar', orientation:'h',
+    x:[9,8,7,6,5,4,3,5],
+    y:['Volley','Smash','Bandeja','Vibora','Chiquita','Globo','Bajada','Unknown'],
+    marker:{color:['#14b8a6','#6366f1','#22c55e','#f59e0b','#f97316','#8b5cf6','#ec4899','#555']},
+    text:['9 (19%)','8 (17%)','7 (15%)','6 (13%)','5 (11%)','4 (9%)','3 (6%)','5 (11%)'],
+    textposition:'outside',
+  }],{...DARK,height:280,
+    xaxis:{title:'Count',gridcolor:'#2d3139'},
+    yaxis:{autorange:'reversed'},
+    margin:{l:80,r:80,t:20,b:40}});
+
+  const hits_p1 = gauss(0.8,4,2,2,47);
+  Plotly.newPlot('hit-court',[kdeTrace(hits_p1.xs,hits_p1.ys)],courtLayout(340,680,'Hit locations'));
+}
+
+// ── My Partner ──
+function drawPartner() {
+  const T=Array.from({length:300},(_,i)=>i*0.2);
+  const rv=T.map((_,i)=>Math.max(-1,Math.min(1,0.71+0.18*Math.sin(i*0.14)+(Math.random()-0.5)*0.15)));
+  const rh=T.map((_,i)=>Math.max(-1,Math.min(1,0.58+0.22*Math.sin(i*0.18)+(Math.random()-0.5)*0.18)));
+  Plotly.newPlot('sync-chart',[
+    {x:T,y:rv,mode:'lines',name:'Forward/back (Vy)',line:{color:'#6366f1'}},
+    {x:T,y:rh,mode:'lines',name:'Side-to-side (Vx)',line:{color:'#f43f5e'}},
+    {x:[0,60],y:[0,0],mode:'lines',line:{color:'#555',dash:'dot',width:1},showlegend:false},
+  ],{...DARK,height:200,
+    yaxis:{title:'Pearson r',range:[-1.1,1.1],gridcolor:'#2d3139'},
+    xaxis:{title:'Time (s)',gridcolor:'#2d3139'},
+    legend:{orientation:'h',y:1.1}});
+}
+
+// ── Match Overview ──
+function drawOverview() {
+  Plotly.newPlot('overview-zones',[
+    {name:'Front',    x:['Alice','Bob','Carlos','Diana'],y:[61,54,18,22],type:'bar',marker:{color:'#22c55e'}},
+    {name:'Transition',x:['Alice','Bob','Carlos','Diana'],y:[24,28,18,20],type:'bar',marker:{color:'#f59e0b'}},
+    {name:'Back',     x:['Alice','Bob','Carlos','Diana'],y:[15,18,64,58],type:'bar',marker:{color:'#ef4444'}},
+  ],{...DARK,barmode:'stack',height:280,
+    yaxis:{title:'% of time',gridcolor:'#2d3139'},
+    legend:{orientation:'h',y:1.1}});
+
+  [['ov-h1',gauss(1,5.5,1.8,2,300),'Alice'],
+   ['ov-h2',gauss(-1,5.5,1.8,2,300),'Bob'],
+   ['ov-h3',gauss(1,-5.5,1.8,2,300),'Carlos'],
+   ['ov-h4',gauss(-1,-5.5,1.8,2,300),'Diana']].forEach(([id,d,name])=>{
+    Plotly.newPlot(id,[kdeTrace(d.xs,d.ys)],courtLayout(220,440,name));
+  });
+}
+
+// Draw visible tab immediately
+drawMovement();
 </script>
 </body>
 </html>
