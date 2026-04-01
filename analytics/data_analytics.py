@@ -268,6 +268,7 @@ class DataAnalytics:
             df[f"ball_{pos}"] = pd.to_numeric(df[f"ball_{pos}"], errors="coerce")
 
         # Ball velocity (frame-interval=1 only)
+        df["delta_time1"] = df["time"].diff(1)
         for pos in ("x", "y"):
             df[f"ball_delta{pos}1"] = df[f"ball_{pos}"].diff(1)
         df["ball_Vx1"] = df["ball_deltax1"] / df["delta_time1"]
