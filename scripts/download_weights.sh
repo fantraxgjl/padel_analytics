@@ -66,6 +66,18 @@ if ! $success; then
     exit 1
 fi
 
+# gdown --folder places subfolders at the repo root (e.g. ./ball_detection/).
+# Move the *contents* of each subfolder into the pre-created weights/ subdirectory.
+# Using `mv src/* dst/` avoids the double-nesting that occurs when the target
+# directory already exists and `mv src dst` moves src *inside* dst instead.
+for folder in ball_detection players_detection players_keypoints_detection court_keypoints_detection; do
+    if [ -d "$folder" ]; then
+        echo "Moving $folder/ into weights/"
+        mv "$folder"/* "weights/$folder/"
+        rm -rf "$folder"
+    fi
+done
+
 # Verify all required files are actually present and non-empty
 all_present=true
 for f in "${REQUIRED_FILES[@]}"; do
