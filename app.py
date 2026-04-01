@@ -291,7 +291,7 @@ if load_video or st.session_state["video"] is not None:
                 if gdrive_match or "drive.google.com" in video_url:
                     import gdown
                     file_id = gdrive_match.group(1) if gdrive_match else video_url
-                    gdown.download(id=file_id, output=tmp_input_path, quiet=False)
+                    gdown.download(id=file_id, output=tmp_input_path, quiet=False, fuzzy=True)
                 else:
                     response = requests.get(video_url, stream=True, timeout=300)
                     response.raise_for_status()
