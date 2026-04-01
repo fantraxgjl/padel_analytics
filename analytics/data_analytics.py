@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from copy import deepcopy
 import pandas as pd
 import numpy as np
-import functools
 
 
 class InvalidDataPoint(Exception):
@@ -86,7 +85,6 @@ class DataPoint:
             )
             return players_position
         
-        print("data_analytics: impossible to sort, missing players position")
         return None
 
 class DataAnalytics:
@@ -230,27 +228,6 @@ class DataAnalytics:
         Retrieves a dataframe with additional features
         """
 
-        def norm(x: float, y: float) -> float:
-            return np.sqrt(x**2 + y**2)
-
-        def calculate_distance(row, player_id: int):
-            return norm(
-                row[f"player{player_id}_deltax1"], 
-                row[f"player{player_id}_deltay1"], 
-            )
-        
-        def calculate_norm_velocity(row, player_id: int, frame_interval: int) -> float:
-            return norm(
-                row[f"player{player_id}_Vx{frame_interval}"],
-                row[f"player{player_id}_Vy{frame_interval}"],
-            )
-
-        def calculate_norm_acceleration(row, player_id: int, frame_interval: int) -> float:
-            return norm(
-                row[f"player{player_id}_Ax{frame_interval}"],
-                row[f"player{player_id}_Ay{frame_interval}"],
-            )
-
         frame_intervals = (1, 2, 3, 4)
         player_ids = (1, 2, 3, 4)
 
@@ -258,7 +235,7 @@ class DataAnalytics:
         df["time"] = df["frame"] * (1/fps)
 
         # Coerce player and ball position columns to float so None becomes NaN and
-        # arithmetic operations (diff, eval) work on frames with missing data
+        # arithmetic operations work on frames with missing data
         for player_id in player_ids:
             for pos in ("x", "y"):
                 df[f"player{player_id}_{pos}"] = pd.to_numeric(
@@ -267,80 +244,57 @@ class DataAnalytics:
         for pos in ("x", "y"):
             df[f"ball_{pos}"] = pd.to_numeric(df[f"ball_{pos}"], errors="coerce")
 
+        # Build all derived columns in a dict first, then concat once to avoid
+        # DataFrame fragmentation from repeated single-column assignments.
+        new_cols = {}
+
         # Ball velocity (frame-interval=1 only)
-        df["delta_time1"] = df["time"].diff(1)
+        dt1 = df["time"].diff(1)
+        new_cols["delta_time1"] = dt1
         for pos in ("x", "y"):
-            df[f"ball_delta{pos}1"] = df[f"ball_{pos}"].diff(1)
-        df["ball_Vx1"] = df["ball_deltax1"] / df["delta_time1"]
-        df["ball_Vy1"] = df["ball_deltay1"] / df["delta_time1"]
-        df["ball_Vnorm1"] = df.apply(
-            lambda row: norm(row["ball_Vx1"], row["ball_Vy1"]),
-            axis=1,
+            new_cols[f"ball_delta{pos}1"] = df[f"ball_{pos}"].diff(1)
+        new_cols["ball_Vx1"] = new_cols["ball_deltax1"] / dt1
+        new_cols["ball_Vy1"] = new_cols["ball_deltay1"] / dt1
+        new_cols["ball_Vnorm1"] = np.sqrt(
+            new_cols["ball_Vx1"] ** 2 + new_cols["ball_Vy1"] ** 2
         )
 
         for frame_interval in frame_intervals:
-            # Time in seconds between each frame for a given frame interval
-            df[f"delta_time{frame_interval}"] = df["time"].diff(frame_interval)
+            dt = df["time"].diff(frame_interval)
+            new_cols[f"delta_time{frame_interval}"] = dt
             for player_id in player_ids:
                 for pos in ("x", "y"):
-                    # Displacement in x and y for each of the players 
-                    # for a given time interval
-                    df[
-                        f"player{player_id}_delta{pos}{frame_interval}"
-                    ] = df[f"player{player_id}_{pos}"].diff(frame_interval)
+                    # Displacement
+                    delta = df[f"player{player_id}_{pos}"].diff(frame_interval)
+                    new_cols[f"player{player_id}_delta{pos}{frame_interval}"] = delta
+                    # Velocity
+                    v = delta / dt
+                    new_cols[f"player{player_id}_V{pos}{frame_interval}"] = v
+                    # Velocity difference
+                    delta_v = v.diff(frame_interval)
+                    new_cols[f"player{player_id}_deltaV{pos}{frame_interval}"] = delta_v
+                    # Acceleration
+                    new_cols[f"player{player_id}_A{pos}{frame_interval}"] = delta_v / dt
 
-                    # Velocity in x and y for each of the players 
-                    # for a given time interval
-                    eval_string_velocity = f"""
-                    player{player_id}_delta{pos}{frame_interval} / delta_time{frame_interval}
-                    """
-                    df[f"player{player_id}_V{pos}{frame_interval}"] = df.eval(
-                        eval_string_velocity,
-                    )
+                vx = new_cols[f"player{player_id}_Vx{frame_interval}"]
+                vy = new_cols[f"player{player_id}_Vy{frame_interval}"]
+                ax = new_cols[f"player{player_id}_Ax{frame_interval}"]
+                ay = new_cols[f"player{player_id}_Ay{frame_interval}"]
 
-                    # Velocity difference in x and y for each of the players 
-                    # for a given time interval
-                    df[
-                        f"player{player_id}_deltaV{pos}{frame_interval}"
-                    ] = df[f"player{player_id}_V{pos}{frame_interval}"].diff(frame_interval)
-
-                    # Acceleration in x and y for each of the players
-                    # for a given time interval
-                    eval_string_acceleration = f"""
-                    player{player_id}_deltaV{pos}{frame_interval} / delta_time{frame_interval}
-                    """
-                    df[f"player{player_id}_A{pos}{frame_interval}"] = df.eval(
-                        eval_string_acceleration,
-                    )
-                
-                # Calculate player distance in between frames
-                df[f"player{player_id}_distance"] = df.apply(
-                    functools.partial(calculate_distance, player_id=player_id),
-                    axis=1,
+                new_cols[f"player{player_id}_Vnorm{frame_interval}"] = np.sqrt(
+                    vx ** 2 + vy ** 2
+                )
+                new_cols[f"player{player_id}_Anorm{frame_interval}"] = np.sqrt(
+                    ax ** 2 + ay ** 2
                 )
 
-                # Calculate norm velocity for each of the players
-                # for a given time interval
-                df[f"player{player_id}_Vnorm{frame_interval}"] = df.apply(
-                    functools.partial(
-                        calculate_norm_velocity, 
-                        player_id=player_id,
-                        frame_interval=frame_interval,
-                    ),
-                    axis=1,
-                )
+        # Player distance uses deltax1 / deltay1 (computed above in frame_interval=1)
+        for player_id in player_ids:
+            dx = new_cols[f"player{player_id}_deltax1"]
+            dy = new_cols[f"player{player_id}_deltay1"]
+            new_cols[f"player{player_id}_distance"] = np.sqrt(dx ** 2 + dy ** 2)
 
-                # Calculate norm acceleration for each of the players
-                # for a given time interval
-                df[f"player{player_id}_Anorm{frame_interval}"] = df.apply(
-                    functools.partial(
-                        calculate_norm_acceleration, 
-                        player_id=player_id,
-                        frame_interval=frame_interval,
-                    ),
-                    axis=1,
-                )
-        
+        df = pd.concat([df, pd.DataFrame(new_cols, index=df.index)], axis=1)
         return df
 
 
@@ -396,8 +350,8 @@ def partner_synchrony(
     rolling_v = vya.rolling(window, min_periods=2).corr(vyb)
     rolling_h = vxa.rolling(window, min_periods=2).corr(vxb)
 
-    vertical_sync = rolling_v.mean()
-    horizontal_sync = rolling_h.mean()
+    vertical_sync = rolling_v.mean() if rolling_v.notna().any() else float("nan")
+    horizontal_sync = rolling_h.mean() if rolling_h.notna().any() else float("nan")
     formation_width = (xa - xb).abs().median()
 
     def _safe(v):
