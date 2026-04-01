@@ -1,5 +1,5 @@
-# Base: NVIDIA CUDA 12.1 + cuDNN 8 on Ubuntu 22.04
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+# Base: NVIDIA CUDA 12.4 + cuDNN on Ubuntu 22.04
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -21,12 +21,12 @@ RUN ln -sf /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
 
-# Install PyTorch with the CUDA 12.1 wheel first (must come before requirements.txt)
+# Install PyTorch with the CUDA 12.4 wheel first (must come before requirements.txt)
 RUN pip install --no-cache-dir \
-    torch==2.3.0+cu121 \
-    torchvision==0.18.0+cu121 \
-    torchaudio==2.3.0+cu121 \
-    --index-url https://download.pytorch.org/whl/cu121
+    torch==2.5.1+cu124 \
+    torchvision==0.20.1+cu124 \
+    torchaudio==2.5.1+cu124 \
+    --index-url https://download.pytorch.org/whl/cu124
 
 # Install remaining Python dependencies
 COPY requirements.txt .
