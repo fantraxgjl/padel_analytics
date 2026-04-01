@@ -38,7 +38,8 @@ COPY . .
 # Install gdown for weight downloads at startup
 RUN pip install --quiet gdown
 
-# Create runtime directories that are gitignored
+# Create runtime directories that are gitignored.
+# weights/ is the default WEIGHTS_DIR; RunPod volumes are typically at /runpod-volume.
 RUN mkdir -p cache weights/players_detection weights/ball_detection \
              weights/players_keypoints_detection weights/court_keypoints_detection
 

@@ -26,9 +26,14 @@ FIXED_COURT_KEYPOINTS_LOAD_PATH = os.getenv(
 )
 FIXED_COURT_KEYPOINTS_SAVE_PATH = os.getenv("FIXED_COURT_KEYPOINTS_SAVE_PATH", None)
 
+# Base directory for all model weights.
+# Override with WEIGHTS_DIR to point at a mounted volume, e.g.:
+#   WEIGHTS_DIR=/runpod-volume/weights
+WEIGHTS_DIR = os.getenv("WEIGHTS_DIR", "./weights")
+
 # Players tracker
 PLAYERS_TRACKER_MODEL = os.getenv(
-    "PLAYERS_TRACKER_MODEL", "./weights/players_detection/yolov8m.pt"
+    "PLAYERS_TRACKER_MODEL", f"{WEIGHTS_DIR}/players_detection/yolov8m.pt"
 )
 PLAYERS_TRACKER_BATCH_SIZE = int(os.getenv("PLAYERS_TRACKER_BATCH_SIZE", "8"))
 PLAYERS_TRACKER_ANNOTATOR = os.getenv(
@@ -43,7 +48,7 @@ PLAYERS_TRACKER_SAVE_PATH = os.getenv(
 
 # Players keypoints tracker
 PLAYERS_KEYPOINTS_TRACKER_MODEL = os.getenv(
-    "PLAYERS_KEYPOINTS_TRACKER_MODEL", "./weights/players_keypoints_detection/best.pt"
+    "PLAYERS_KEYPOINTS_TRACKER_MODEL", f"{WEIGHTS_DIR}/players_keypoints_detection/best.pt"
 )
 PLAYERS_KEYPOINTS_TRACKER_TRAIN_IMAGE_SIZE = int(
     os.getenv("PLAYERS_KEYPOINTS_TRACKER_TRAIN_IMAGE_SIZE", "1280")
@@ -60,10 +65,10 @@ PLAYERS_KEYPOINTS_TRACKER_SAVE_PATH = os.getenv(
 
 # Ball tracker
 BALL_TRACKER_MODEL = os.getenv(
-    "BALL_TRACKER_MODEL", "./weights/ball_detection/TrackNet_best.pt"
+    "BALL_TRACKER_MODEL", f"{WEIGHTS_DIR}/ball_detection/TrackNet_best.pt"
 )
 BALL_TRACKER_INPAINT_MODEL = os.getenv(
-    "BALL_TRACKER_INPAINT_MODEL", "./weights/ball_detection/InpaintNet_best.pt"
+    "BALL_TRACKER_INPAINT_MODEL", f"{WEIGHTS_DIR}/ball_detection/InpaintNet_best.pt"
 )
 BALL_TRACKER_BATCH_SIZE = int(os.getenv("BALL_TRACKER_BATCH_SIZE", "8"))
 BALL_TRACKER_MEDIAN_MAX_SAMPLE_NUM = int(
@@ -78,7 +83,7 @@ BALL_TRACKER_SAVE_PATH = os.getenv(
 
 # Court keypoints tracker
 KEYPOINTS_TRACKER_MODEL = os.getenv(
-    "KEYPOINTS_TRACKER_MODEL", "./weights/court_keypoints_detection/best.pt"
+    "KEYPOINTS_TRACKER_MODEL", f"{WEIGHTS_DIR}/court_keypoints_detection/best.pt"
 )
 KEYPOINTS_TRACKER_BATCH_SIZE = int(os.getenv("KEYPOINTS_TRACKER_BATCH_SIZE", "8"))
 KEYPOINTS_TRACKER_MODEL_TYPE = os.getenv("KEYPOINTS_TRACKER_MODEL_TYPE", "yolo")
