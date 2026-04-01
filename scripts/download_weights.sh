@@ -2,6 +2,9 @@
 # Download model weights from Google Drive into ./weights/
 # Skips the download entirely if all required files are already present.
 # Retries up to 3 times on network failure.
+#
+# Manual fallback: download https://drive.google.com/drive/folders/1joO7w1Am7B418SIqGBq90YipQl81FMzh
+# and mount the extracted folder: docker run -v /path/to/weights:/app/weights ...
 set -uo pipefail
 
 FOLDER_ID="1joO7w1Am7B418SIqGBq90YipQl81FMzh"
@@ -26,7 +29,7 @@ if [ "${SKIP_WEIGHTS_DOWNLOAD:-0}" = "1" ]; then
     exit 0
 fi
 
-# Skip download if all weights already present (e.g. container restart)
+# Skip download if all weights already present (e.g. mounted volume or container restart)
 all_present=true
 for f in "${REQUIRED_FILES[@]}"; do
     if [ ! -s "$f" ]; then
@@ -62,7 +65,9 @@ done
 
 if ! $success; then
     echo "ERROR: Failed to download weights after $max_attempts attempts." >&2
-    echo "Check network connectivity and Google Drive folder permissions." >&2
+    echo "Manual fix: download the folder in your browser and mount it:" >&2
+    echo "  https://drive.google.com/drive/folders/${FOLDER_ID}" >&2
+    echo "  docker run -v /path/to/weights:/app/weights ..." >&2
     exit 1
 fi
 
@@ -88,8 +93,13 @@ for f in "${REQUIRED_FILES[@]}"; do
 done
 
 if ! $all_present; then
-    echo "ERROR: Download reported success but weight files are missing." >&2
-    echo "Check Google Drive folder permissions and quota." >&2
+    echo "" >&2
+    echo "Files found on disk after download:" >&2
+    find . -name "*.pt" -exec ls -lh {} \; 2>/dev/null || echo "  (none)" >&2
+    echo "" >&2
+    echo "Manual fix: download the folder in your browser and mount it:" >&2
+    echo "  https://drive.google.com/drive/folders/${FOLDER_ID}" >&2
+    echo "  docker run -v /path/to/weights:/app/weights ..." >&2
     exit 1
 fi
 
