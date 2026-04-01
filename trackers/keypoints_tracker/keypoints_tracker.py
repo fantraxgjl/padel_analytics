@@ -139,13 +139,14 @@ class KeypointsTracker(Tracker):
     IOU=0.7
     
     def __init__(
-        self, 
+        self,
         model_path: str,
         batch_size: int,
         model_type: Literal["resnet", "yolo"] = "resnet",
         fixed_keypoints_detection: Optional[Keypoints] = None,
         load_path: Optional[str | Path] = None,
         save_path: Optional[str | Path] = None,
+        conf: Optional[float] = None,
     ):
         super().__init__(
             load_path=load_path,
@@ -179,6 +180,8 @@ class KeypointsTracker(Tracker):
             raise ValueError("Unknown model type")
 
         self.fixed_keypoints_detection = fixed_keypoints_detection
+        if conf is not None:
+            self.CONF = conf
 
     def video_info_post_init(self, video_info: sv.VideoInfo) -> "KeypointsTracker":
         return self

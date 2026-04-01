@@ -396,6 +396,7 @@ if load_video or st.session_state["video"] is not None:
                 fixed_keypoints_detection=st.session_state["fixed_keypoints_detection"],
                 load_path=KEYPOINTS_TRACKER_LOAD_PATH,
                 save_path=KEYPOINTS_TRACKER_SAVE_PATH,
+                conf=KEYPOINTS_TRACKER_CONF,
             )
 
             runner = TrackingRunner(

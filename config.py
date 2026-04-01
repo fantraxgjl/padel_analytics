@@ -82,8 +82,13 @@ KEYPOINTS_TRACKER_MODEL = os.getenv(
 )
 KEYPOINTS_TRACKER_BATCH_SIZE = int(os.getenv("KEYPOINTS_TRACKER_BATCH_SIZE", "8"))
 KEYPOINTS_TRACKER_MODEL_TYPE = os.getenv("KEYPOINTS_TRACKER_MODEL_TYPE", "yolo")
-KEYPOINTS_TRACKER_LOAD_PATH = os.getenv("KEYPOINTS_TRACKER_LOAD_PATH", None)
-KEYPOINTS_TRACKER_SAVE_PATH = os.getenv("KEYPOINTS_TRACKER_SAVE_PATH", None)
+KEYPOINTS_TRACKER_CONF = float(os.getenv("KEYPOINTS_TRACKER_CONF", "0.3"))
+KEYPOINTS_TRACKER_LOAD_PATH = os.getenv(
+    "KEYPOINTS_TRACKER_LOAD_PATH", "./cache/court_keypoints_detections.json"
+)
+KEYPOINTS_TRACKER_SAVE_PATH = os.getenv(
+    "KEYPOINTS_TRACKER_SAVE_PATH", "./cache/court_keypoints_detections.json"
+)
 
 # Results storage directory (for video history)
 RESULTS_DIR = os.getenv("RESULTS_DIR", "./cache/results")
