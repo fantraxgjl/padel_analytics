@@ -22,6 +22,13 @@ mkdir -p weights/players_detection \
          weights/players_keypoints_detection \
          weights/court_keypoints_detection
 
+# Allow completely bypassing the download (e.g. weights mounted via a volume)
+if [ "${SKIP_WEIGHTS_DOWNLOAD:-0}" = "1" ]; then
+    echo "SKIP_WEIGHTS_DOWNLOAD=1 — skipping download, trusting mounted weights."
+    find weights/ -name "*.pt" -exec ls -lh {} \; 2>/dev/null || true
+    exit 0
+fi
+
 # Skip download if all weights already present (e.g. mounted volume or container restart)
 all_present=true
 for f in "${REQUIRED_FILES[@]}"; do
@@ -64,12 +71,15 @@ if ! $success; then
     exit 1
 fi
 
-# gdown downloads the Drive folder's subfolders directly into the current directory.
-# Move the known weight subfolders into weights/ if they landed at the root level.
+# gdown --folder places subfolders at the repo root (e.g. ./ball_detection/).
+# Move the *contents* of each subfolder into the pre-created weights/ subdirectory.
+# Using `mv src/* dst/` avoids the double-nesting that occurs when the target
+# directory already exists and `mv src dst` moves src *inside* dst instead.
 for folder in ball_detection players_detection players_keypoints_detection court_keypoints_detection; do
     if [ -d "$folder" ]; then
         echo "Moving $folder/ into weights/"
-        mv "$folder" "weights/$folder"
+        mv "$folder"/* "weights/$folder/"
+        rm -rf "$folder"
     fi
 done
 
