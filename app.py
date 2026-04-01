@@ -309,6 +309,29 @@ if load_video or st.session_state["video"] is not None:
 
     if st.session_state["df"] is None:
 
+        # Validate required weight files exist before doing any heavy work.
+        _missing_weights = [
+            p for p in (
+                PLAYERS_TRACKER_MODEL,
+                PLAYERS_KEYPOINTS_TRACKER_MODEL,
+                BALL_TRACKER_MODEL,
+                BALL_TRACKER_INPAINT_MODEL,
+                KEYPOINTS_TRACKER_MODEL,
+            )
+            if not os.path.isfile(p)
+        ]
+        if _missing_weights:
+            st.error(
+                "**Missing model weights — cannot run analysis.**\n\n"
+                "The following files were not found:\n"
+                + "\n".join(f"- `{p}`" for p in _missing_weights)
+                + "\n\nRun `bash scripts/download_weights.sh` inside the container, "
+                "or mount a pre-downloaded weights folder via "
+                "`docker run -v /path/to/weights:/app/weights ...` and set "
+                "`SKIP_WEIGHTS_DOWNLOAD=1`."
+            )
+            st.stop()
+
         with st.status("Analysing video...", expanded=True) as _status:
 
             def progress_callback(step_name, current, total):
