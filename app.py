@@ -323,6 +323,7 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
         st.session_state["kp_selection"] = None  # reset on new video load
         st.session_state["kp_active_id"] = None
         st.session_state["kp_order"] = None
+        st.session_state["kp_last_click"] = None
 
     if st.session_state["df"] is None:
 
@@ -399,6 +400,8 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
                 st.session_state["kp_active_id"] = 0
             if "kp_order" not in st.session_state or st.session_state["kp_order"] is None:
                 st.session_state["kp_order"] = []
+            if "kp_last_click" not in st.session_state:
+                st.session_state["kp_last_click"] = None
 
             _kps = st.session_state["kp_selection"]      # {id: [x, y]}
             _active = st.session_state["kp_active_id"]
@@ -452,17 +455,17 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
 
                 _coords = streamlit_image_coordinates(_pil, key="kp_img")
 
-                if _coords is not None:
+                if _coords is not None and _coords != st.session_state["kp_last_click"]:
+                    st.session_state["kp_last_click"] = _coords
                     _new = [int(_coords["x"] / _scale), int(_coords["y"] / _scale)]
-                    if _kps.get(_active) != _new:
-                        _kps[_active] = _new
-                        if _active in _order:
-                            _order.remove(_active)
-                        _order.append(_active)
-                        # Auto-advance to next unplaced keypoint
-                        for _next in list(range(_active + 1, 12)) + list(range(0, _active)):
-                            if _next not in _kps:
-                                st.session_state["kp_active_id"] = _next
+                    _kps[_active] = _new
+                    if _active in _order:
+                        _order.remove(_active)
+                    _order.append(_active)
+                    # Auto-advance to next unplaced keypoint
+                    for _next in list(range(_active + 1, 12)) + list(range(0, _active)):
+                        if _next not in _kps:
+                            st.session_state["kp_active_id"] = _next
                                 break
                         st.rerun()
 
@@ -478,6 +481,7 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
                         st.session_state["kp_selection"] = {}
                         st.session_state["kp_active_id"] = 0
                         st.session_state["kp_order"] = []
+                        st.session_state["kp_last_click"] = None
                         st.rerun()
 
                 if len(_kps) >= 4:
