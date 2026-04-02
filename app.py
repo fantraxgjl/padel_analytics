@@ -524,16 +524,14 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
                         if v is not None
                     ]
                 )
-                # Build polygon zone from outermost available keypoints
-                # Preference: corners k1,k2,k12,k11 (idx 0,1,11,10); fall back to any 4
-                _present = [v for v in SELECTED_KEYPOINTS if v is not None]
+                # Build polygon zone from outermost available keypoints.
+                # Only use corner keypoints (k1,k2,k12,k11) if all 4 are present;
+                # otherwise fall back to full frame so players aren't filtered out.
                 _corner_ids = [0, 1, 11, 10]  # k1, k2, k12, k11
                 _corners = [SELECTED_KEYPOINTS[_ci] for _ci in _corner_ids
                             if SELECTED_KEYPOINTS[_ci] is not None]
-                if len(_corners) >= 4:
+                if len(_corners) == 4:
                     _poly_pts = np.array(_corners, dtype=np.int32)
-                elif len(_present) >= 4:
-                    _poly_pts = np.array(_present[:4], dtype=np.int32)
                 else:
                     _poly_pts = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.int32)
                 polygon_zone = sv.PolygonZone(
