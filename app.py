@@ -610,7 +610,8 @@ if load_video or st.session_state["video"] is not None:
 
             dist = df[f"player{_me}_distance"].sum()
             max_v = df[f"player{_me}_Vnorm4"].abs().max() * 3.6
-            avg_v = df[f"player{_me}_Vnorm4"].abs().mean() * 3.6
+            _vnorm = df[f"player{_me}_Vnorm4"].abs()
+            avg_v = (_vnorm.mean() * 3.6) if _vnorm.notna().any() else 0.0
             _z = (_analytics.get("zone_breakdown") or {}).get(str(_me)) or zone_breakdown(df, _me)
             _kpi = (_analytics.get("coaching_kpis") or {}).get(str(_me)) or coaching_kpis(df, _me)
 

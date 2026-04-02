@@ -115,8 +115,10 @@ def enrich_rallies(
             xc = f"player{pid}_x"
             yc = f"player{pid}_y"
             if xc in rally_df.columns:
-                mx = pd.to_numeric(rally_df[xc], errors="coerce").mean()
-                my = pd.to_numeric(rally_df[yc], errors="coerce").mean()
+                _x = pd.to_numeric(rally_df[xc], errors="coerce")
+                _y = pd.to_numeric(rally_df[yc], errors="coerce")
+                mx = _x.mean() if _x.notna().any() else float("nan")
+                my = _y.mean() if _y.notna().any() else float("nan")
                 avg_pos[str(pid)] = {
                     "x": round(float(mx), 2) if not np.isnan(mx) else None,
                     "y": round(float(my), 2) if not np.isnan(my) else None,
