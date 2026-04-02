@@ -420,6 +420,11 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
                         f"Click on **{_KP_LABELS[len(_kps)]}**  "
                         f"({len(_kps) + 1} / 12)"
                     )
+                    if len(_kps) >= 4:
+                        st.caption(
+                            f"You can confirm with {len(_kps)} keypoints — "
+                            "the remaining ones will be estimated from court geometry."
+                        )
                 else:
                     st.success("All 12 keypoints selected. Confirm to run analysis.")
 
@@ -442,7 +447,7 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
                         st.session_state["kp_selection"] = []
                         st.rerun()
 
-                if len(_kps) == 12:
+                if len(_kps) >= 4:
                     if st.button("✓ Confirm keypoints & run analysis", type="primary"):
                         os.makedirs(os.path.dirname(_kp_path) or ".", exist_ok=True)
                         with open(_kp_path, "w") as _kf:
