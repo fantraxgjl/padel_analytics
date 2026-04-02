@@ -466,8 +466,8 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
                     for _next in list(range(_active + 1, 12)) + list(range(0, _active)):
                         if _next not in _kps:
                             st.session_state["kp_active_id"] = _next
-                                break
-                        st.rerun()
+                            break
+                    st.rerun()
 
                 _col1, _col2 = st.columns(2)
                 with _col1:
