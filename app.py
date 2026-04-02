@@ -145,7 +145,8 @@ def velocity_estimator(video_info: sv.VideoInfo):
 for _key in ("video", "df", "fixed_keypoints_detection",
              "players_keypoints_tracker", "players_tracker",
              "ball_tracker", "keypoints_tracker", "runner", "analytics",
-             "my_player", "player_names", "current_video_id"):
+             "my_player", "player_names", "current_video_id",
+             "video_ready", "kp_selection"):
     if _key not in st.session_state:
         st.session_state[_key] = None
 
@@ -198,6 +199,18 @@ with st.sidebar:
             with open(_profile_path, "w") as _pf:
                 json.dump(_profile_data, _pf)
             st.success("Saved")
+
+    with st.expander("Court keypoints"):
+        _kp_file = FIXED_COURT_KEYPOINTS_LOAD_PATH
+        if os.path.exists(_kp_file):
+            st.success("Court keypoints saved.")
+            if st.button("Reset court keypoints"):
+                os.remove(_kp_file)
+                st.session_state["kp_selection"] = []
+                st.session_state["df"] = None
+                st.rerun()
+        else:
+            st.info("No court keypoints saved yet. Load a video to select them.")
 
 _pnames = st.session_state["player_names"]
 _me = st.session_state["my_player"]
@@ -264,7 +277,7 @@ video_url = st.text_input(
 )
 load_video = st.button("Load Video")
 
-if load_video or st.session_state["video"] is not None:
+if load_video or st.session_state["video"] is not None or st.session_state.get("video_ready"):
 
     if load_video:
         if not video_url:
@@ -306,8 +319,129 @@ if load_video or st.session_state["video"] is not None:
             os.unlink(tmp_input_path)
             with open(_url_cache, "w") as _f:
                 _f.write(video_url.strip())
+        st.session_state["video_ready"] = True
+        st.session_state["kp_selection"] = None  # reset on new video load
 
     if st.session_state["df"] is None:
+
+        # Validate required weight files exist before doing any heavy work.
+        _missing_weights = [
+            p for p in (
+                PLAYERS_TRACKER_MODEL,
+                PLAYERS_KEYPOINTS_TRACKER_MODEL,
+                BALL_TRACKER_MODEL,
+                BALL_TRACKER_INPAINT_MODEL,
+                KEYPOINTS_TRACKER_MODEL,
+            )
+            if not os.path.isfile(p)
+        ]
+        if _missing_weights:
+            st.error(
+                "**Missing model weights — cannot run analysis.**\n\n"
+                "The following files were not found:\n"
+                + "\n".join(f"- `{p}`" for p in _missing_weights)
+                + "\n\nRun `bash scripts/download_weights.sh` inside the container, "
+                "or mount a pre-downloaded weights folder via "
+                "`docker run -v /path/to/weights:/app/weights ...` and set "
+                "`SKIP_WEIGHTS_DOWNLOAD=1`."
+            )
+            st.stop()
+
+        # ── Court keypoint selection ──────────────────────────────────────────
+        # If no pre-selected keypoints exist, show a click-on-image UI so the
+        # user can manually mark the 12 court keypoints before analysis runs.
+        # This bypasses the automated court keypoints model entirely.
+        _kp_path = FIXED_COURT_KEYPOINTS_LOAD_PATH
+        if not os.path.exists(_kp_path):
+            from streamlit_image_coordinates import streamlit_image_coordinates
+            from PIL import Image, ImageDraw, ImageFont
+            import cv2 as _cv2
+
+            st.subheader("Step 1: Select Court Keypoints")
+            st.markdown(
+                "Click on each of the **12 court keypoints** in the image below, "
+                "following this numbering:\n"
+                "```\n"
+                "k11--------------------k12\n"
+                "|                       |\n"
+                "k8-----------k9--------k10\n"
+                "|            |          |\n"
+                "k6----------------------k7\n"
+                "|            |          |\n"
+                "k3-----------k4---------k5\n"
+                "|                       |\n"
+                "k1----------------------k2\n"
+                "```"
+            )
+
+            _KP_LABELS = [
+                "k1 — bottom-left corner",
+                "k2 — bottom-right corner",
+                "k3 — left, lower service line",
+                "k4 — centre, lower service line",
+                "k5 — right, lower service line",
+                "k6 — left, mid-court (net line)",
+                "k7 — right, mid-court (net line)",
+                "k8 — left, upper service line",
+                "k9 — centre, upper service line",
+                "k10 — right, upper service line",
+                "k11 — top-left corner",
+                "k12 — top-right corner",
+            ]
+
+            if st.session_state["kp_selection"] is None:
+                st.session_state["kp_selection"] = []
+
+            _kps = st.session_state["kp_selection"]
+
+            _cap = _cv2.VideoCapture("tmp.mp4")
+            _ret, _frame = _cap.read()
+            _cap.release()
+
+            if _ret:
+                _frame_rgb = _cv2.cvtColor(_frame, _cv2.COLOR_BGR2RGB)
+                _pil = Image.fromarray(_frame_rgb)
+                _draw = ImageDraw.Draw(_pil)
+                for _i, (_x, _y) in enumerate(_kps):
+                    _draw.ellipse([_x - 8, _y - 8, _x + 8, _y + 8], fill=(255, 50, 50))
+                    _draw.text((_x + 12, _y - 10), f"k{_i + 1}", fill=(255, 50, 50))
+
+                if len(_kps) < 12:
+                    st.info(
+                        f"Click on **{_KP_LABELS[len(_kps)]}**  "
+                        f"({len(_kps) + 1} / 12)"
+                    )
+                else:
+                    st.success("All 12 keypoints selected. Confirm to run analysis.")
+
+                _coords = streamlit_image_coordinates(_pil, key="kp_img", width=960)
+
+                if _coords is not None and len(_kps) < 12:
+                    _new = (_coords["x"], _coords["y"])
+                    if not _kps or _new != tuple(_kps[-1]):
+                        st.session_state["kp_selection"].append(list(_new))
+                        st.rerun()
+
+                _col1, _col2 = st.columns(2)
+                with _col1:
+                    if st.button("↩ Undo last") and _kps:
+                        st.session_state["kp_selection"].pop()
+                        st.rerun()
+                with _col2:
+                    if st.button("✕ Reset all"):
+                        st.session_state["kp_selection"] = []
+                        st.rerun()
+
+                if len(_kps) == 12:
+                    if st.button("✓ Confirm keypoints & run analysis", type="primary"):
+                        os.makedirs(os.path.dirname(_kp_path) or ".", exist_ok=True)
+                        with open(_kp_path, "w") as _kf:
+                            json.dump(_kps, _kf)
+                        st.rerun()
+            else:
+                st.error("Could not read first frame from video.")
+            st.stop()
+        # ─────────────────────────────────────────────────────────────────────
 
         with st.status("Analysing video...", expanded=True) as _status:
 
@@ -587,7 +721,8 @@ if load_video or st.session_state["video"] is not None:
 
             dist = df[f"player{_me}_distance"].sum()
             max_v = df[f"player{_me}_Vnorm4"].abs().max() * 3.6
-            avg_v = df[f"player{_me}_Vnorm4"].abs().mean() * 3.6
+            _vnorm = df[f"player{_me}_Vnorm4"].abs()
+            avg_v = (_vnorm.mean() * 3.6) if _vnorm.notna().any() else 0.0
             _z = (_analytics.get("zone_breakdown") or {}).get(str(_me)) or zone_breakdown(df, _me)
             _kpi = (_analytics.get("coaching_kpis") or {}).get(str(_me)) or coaching_kpis(df, _me)
 

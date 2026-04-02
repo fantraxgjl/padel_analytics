@@ -415,7 +415,7 @@ def lateral_bias(df: pd.DataFrame, player_id: int) -> float:
     Near zero = balanced lateral coverage.
     """
     vx = pd.to_numeric(df[f"player{player_id}_Vx1"], errors="coerce")
-    result = vx.mean()
+    result = vx.mean() if vx.notna().any() else float("nan")
     return round(float(result), 3) if not np.isnan(result) else 0.0
 
 
