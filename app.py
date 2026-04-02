@@ -400,24 +400,39 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
 
             if _ret:
                 _frame_rgb = _cv2.cvtColor(_frame, _cv2.COLOR_BGR2RGB)
-                _pil = Image.fromarray(_frame_rgb)
+                _orig_w, _orig_h = _frame_rgb.shape[1], _frame_rgb.shape[0]
+
+                # Resize to display width so the component doesn't clip
+                _display_w = 900
+                _scale = _display_w / _orig_w
+                _display_h = int(_orig_h * _scale)
+                _pil = Image.fromarray(_frame_rgb).resize(
+                    (_display_w, _display_h), Image.LANCZOS
+                )
                 _draw = ImageDraw.Draw(_pil)
                 for _i, (_x, _y) in enumerate(_kps):
-                    _draw.ellipse([_x - 8, _y - 8, _x + 8, _y + 8], fill=(255, 50, 50))
-                    _draw.text((_x + 12, _y - 10), f"k{_i + 1}", fill=(255, 50, 50))
+                    _dx, _dy = int(_x * _scale), int(_y * _scale)
+                    _draw.ellipse([_dx - 8, _dy - 8, _dx + 8, _dy + 8], fill=(255, 50, 50))
+                    _draw.text((_dx + 10, _dy - 10), f"k{_i + 1}", fill=(255, 50, 50))
 
                 if len(_kps) < 12:
                     st.info(
                         f"Click on **{_KP_LABELS[len(_kps)]}**  "
                         f"({len(_kps) + 1} / 12)"
                     )
+                    if len(_kps) >= 4:
+                        st.caption(
+                            f"You can confirm with {len(_kps)} keypoints — "
+                            "the remaining ones will be estimated from court geometry."
+                        )
                 else:
                     st.success("All 12 keypoints selected. Confirm to run analysis.")
 
-                _coords = streamlit_image_coordinates(_pil, key="kp_img", width=960)
+                _coords = streamlit_image_coordinates(_pil, key="kp_img")
 
                 if _coords is not None and len(_kps) < 12:
-                    _new = (_coords["x"], _coords["y"])
+                    # Scale display coords back to original frame resolution
+                    _new = (int(_coords["x"] / _scale), int(_coords["y"] / _scale))
                     if not _kps or _new != tuple(_kps[-1]):
                         st.session_state["kp_selection"].append(list(_new))
                         st.rerun()
@@ -432,7 +447,7 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
                         st.session_state["kp_selection"] = []
                         st.rerun()
 
-                if len(_kps) == 12:
+                if len(_kps) >= 4:
                     if st.button("✓ Confirm keypoints & run analysis", type="primary"):
                         os.makedirs(os.path.dirname(_kp_path) or ".", exist_ok=True)
                         with open(_kp_path, "w") as _kf:

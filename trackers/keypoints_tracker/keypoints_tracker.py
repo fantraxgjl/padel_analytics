@@ -203,7 +203,13 @@ class KeypointsTracker(Tracker):
         else:
             raise ValueError("Unknown model type")
 
-        self.fixed_keypoints_detection = fixed_keypoints_detection
+        if fixed_keypoints_detection is not None:
+            _estimated = self._estimate_missing_keypoints(
+                list(fixed_keypoints_detection)
+            )
+            self.fixed_keypoints_detection = Keypoints(_estimated)
+        else:
+            self.fixed_keypoints_detection = None
         if conf is not None:
             self.CONF = conf
 
