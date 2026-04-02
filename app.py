@@ -146,7 +146,7 @@ for _key in ("video", "df", "fixed_keypoints_detection",
              "players_keypoints_tracker", "players_tracker",
              "ball_tracker", "keypoints_tracker", "runner", "analytics",
              "my_player", "player_names", "current_video_id",
-             "video_ready", "kp_selection"):
+             "video_ready", "kp_selection", "kp_active_id", "kp_order"):
     if _key not in st.session_state:
         st.session_state[_key] = None
 
@@ -321,6 +321,8 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
                 _f.write(video_url.strip())
         st.session_state["video_ready"] = True
         st.session_state["kp_selection"] = None  # reset on new video load
+        st.session_state["kp_active_id"] = None
+        st.session_state["kp_order"] = None
 
     if st.session_state["df"] is None:
 
@@ -354,13 +356,14 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
         _kp_path = FIXED_COURT_KEYPOINTS_LOAD_PATH
         if not os.path.exists(_kp_path):
             from streamlit_image_coordinates import streamlit_image_coordinates
-            from PIL import Image, ImageDraw, ImageFont
+            from PIL import Image, ImageDraw
             import cv2 as _cv2
 
             st.subheader("Step 1: Select Court Keypoints")
             st.markdown(
-                "Click on each of the **12 court keypoints** in the image below, "
-                "following this numbering:\n"
+                "Select which keypoint to place using the buttons below, then click "
+                "its location on the image. Skip any that are out of frame — at least "
+                "**4 visible keypoints** are required.\n\n"
                 "```\n"
                 "k11--------------------k12\n"
                 "|                       |\n"
@@ -389,10 +392,43 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
                 "k12 — top-right corner",
             ]
 
+            # kp_selection: dict {keypoint_id (0-based): [x, y]}
             if st.session_state["kp_selection"] is None:
-                st.session_state["kp_selection"] = []
+                st.session_state["kp_selection"] = {}
+            if "kp_active_id" not in st.session_state or st.session_state["kp_active_id"] is None:
+                st.session_state["kp_active_id"] = 0
+            if "kp_order" not in st.session_state or st.session_state["kp_order"] is None:
+                st.session_state["kp_order"] = []
 
-            _kps = st.session_state["kp_selection"]
+            _kps = st.session_state["kp_selection"]      # {id: [x, y]}
+            _active = st.session_state["kp_active_id"]
+            _order = st.session_state["kp_order"]        # placement order for undo
+
+            # Keypoint selector grid
+            st.write("**Select keypoint to place:**")
+            _btn_cols = st.columns(6)
+            for _i in range(12):
+                _col = _btn_cols[_i % 6]
+                _short = f"k{_i + 1}"
+                if _i == _active:
+                    _col.markdown(f"**→ {_short}**")
+                elif _i in _kps:
+                    if _col.button(f"✓ {_short}", key=f"kpb_{_i}"):
+                        st.session_state["kp_active_id"] = _i
+                        st.rerun()
+                else:
+                    if _col.button(_short, key=f"kpb_{_i}"):
+                        st.session_state["kp_active_id"] = _i
+                        st.rerun()
+
+            st.info(
+                f"Placing: **{_KP_LABELS[_active]}** — click its location on the image below"
+            )
+            if len(_kps) >= 4:
+                st.caption(
+                    f"{len(_kps)}/12 placed — you can confirm now or continue adding. "
+                    "Missing keypoints will be estimated from court geometry."
+                )
 
             _cap = _cv2.VideoCapture("tmp.mp4")
             _ret, _frame = _cap.read()
@@ -401,8 +437,6 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
             if _ret:
                 _frame_rgb = _cv2.cvtColor(_frame, _cv2.COLOR_BGR2RGB)
                 _orig_w, _orig_h = _frame_rgb.shape[1], _frame_rgb.shape[0]
-
-                # Resize to display width so the component doesn't clip
                 _display_w = 900
                 _scale = _display_w / _orig_w
                 _display_h = int(_orig_h * _scale)
@@ -410,48 +444,48 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
                     (_display_w, _display_h), Image.LANCZOS
                 )
                 _draw = ImageDraw.Draw(_pil)
-                for _i, (_x, _y) in enumerate(_kps):
+                for _kid, (_x, _y) in _kps.items():
                     _dx, _dy = int(_x * _scale), int(_y * _scale)
-                    _draw.ellipse([_dx - 8, _dy - 8, _dx + 8, _dy + 8], fill=(255, 50, 50))
-                    _draw.text((_dx + 10, _dy - 10), f"k{_i + 1}", fill=(255, 50, 50))
-
-                if len(_kps) < 12:
-                    st.info(
-                        f"Click on **{_KP_LABELS[len(_kps)]}**  "
-                        f"({len(_kps) + 1} / 12)"
-                    )
-                    if len(_kps) >= 4:
-                        st.caption(
-                            f"You can confirm with {len(_kps)} keypoints — "
-                            "the remaining ones will be estimated from court geometry."
-                        )
-                else:
-                    st.success("All 12 keypoints selected. Confirm to run analysis.")
+                    _color = (255, 200, 0) if _kid == _active else (255, 50, 50)
+                    _draw.ellipse([_dx - 8, _dy - 8, _dx + 8, _dy + 8], fill=_color)
+                    _draw.text((_dx + 10, _dy - 10), f"k{_kid + 1}", fill=_color)
 
                 _coords = streamlit_image_coordinates(_pil, key="kp_img")
 
-                if _coords is not None and len(_kps) < 12:
-                    # Scale display coords back to original frame resolution
-                    _new = (int(_coords["x"] / _scale), int(_coords["y"] / _scale))
-                    if not _kps or _new != tuple(_kps[-1]):
-                        st.session_state["kp_selection"].append(list(_new))
+                if _coords is not None:
+                    _new = [int(_coords["x"] / _scale), int(_coords["y"] / _scale)]
+                    if _kps.get(_active) != _new:
+                        _kps[_active] = _new
+                        if _active in _order:
+                            _order.remove(_active)
+                        _order.append(_active)
+                        # Auto-advance to next unplaced keypoint
+                        for _next in list(range(_active + 1, 12)) + list(range(0, _active)):
+                            if _next not in _kps:
+                                st.session_state["kp_active_id"] = _next
+                                break
                         st.rerun()
 
                 _col1, _col2 = st.columns(2)
                 with _col1:
-                    if st.button("↩ Undo last") and _kps:
-                        st.session_state["kp_selection"].pop()
+                    if st.button("↩ Undo last") and _order:
+                        _last = _order.pop()
+                        _kps.pop(_last, None)
+                        st.session_state["kp_active_id"] = _last
                         st.rerun()
                 with _col2:
                     if st.button("✕ Reset all"):
-                        st.session_state["kp_selection"] = []
+                        st.session_state["kp_selection"] = {}
+                        st.session_state["kp_active_id"] = 0
+                        st.session_state["kp_order"] = []
                         st.rerun()
 
                 if len(_kps) >= 4:
                     if st.button("✓ Confirm keypoints & run analysis", type="primary"):
                         os.makedirs(os.path.dirname(_kp_path) or ".", exist_ok=True)
+                        _kp_list = [_kps.get(_i) for _i in range(12)]
                         with open(_kp_path, "w") as _kf:
-                            json.dump(_kps, _kf)
+                            json.dump(_kp_list, _kf)
                         st.rerun()
             else:
                 st.error("Could not read first frame from video.")
@@ -478,26 +512,28 @@ if load_video or st.session_state["video"] is not None or st.session_state.get("
             if FIXED_COURT_KEYPOINTS_LOAD_PATH is not None and os.path.exists(FIXED_COURT_KEYPOINTS_LOAD_PATH):
                 with open(FIXED_COURT_KEYPOINTS_LOAD_PATH, "r") as f:
                     SELECTED_KEYPOINTS = json.load(f)
+                # SELECTED_KEYPOINTS is a 12-element list; entries may be null for skipped kps
                 fixed_keypoints = Keypoints(
                     [
-                        Keypoint(
-                            id=i,
-                            xy=tuple(float(x) for x in v)
-                        )
+                        Keypoint(id=i, xy=tuple(float(x) for x in v))
                         for i, v in enumerate(SELECTED_KEYPOINTS)
+                        if v is not None
                     ]
                 )
-                keypoints_array = np.array(SELECTED_KEYPOINTS, dtype=np.int32)
+                # Build polygon zone from outermost available keypoints
+                # Preference: corners k1,k2,k12,k11 (idx 0,1,11,10); fall back to any 4
+                _present = [v for v in SELECTED_KEYPOINTS if v is not None]
+                _corner_ids = [0, 1, 11, 10]  # k1, k2, k12, k11
+                _corners = [SELECTED_KEYPOINTS[_ci] for _ci in _corner_ids
+                            if SELECTED_KEYPOINTS[_ci] is not None]
+                if len(_corners) >= 4:
+                    _poly_pts = np.array(_corners, dtype=np.int32)
+                elif len(_present) >= 4:
+                    _poly_pts = np.array(_present[:4], dtype=np.int32)
+                else:
+                    _poly_pts = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.int32)
                 polygon_zone = sv.PolygonZone(
-                    np.concatenate(
-                        (
-                            np.expand_dims(keypoints_array[0], axis=0),
-                            np.expand_dims(keypoints_array[1], axis=0),
-                            np.expand_dims(keypoints_array[-1], axis=0),
-                            np.expand_dims(keypoints_array[-2], axis=0),
-                        ),
-                        axis=0
-                    ),
+                    _poly_pts,
                     frame_resolution_wh=(w, h),
                 )
             else:
